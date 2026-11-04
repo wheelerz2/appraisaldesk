@@ -3171,6 +3171,24 @@ function showPage(name) {
 }
 
 let _leafletMap = null;
+let _geocodeCache = {}; // address → {lat, lon}
+
+// JSONP geocoder — avoids fetch() so no proxy issues; loads as a <script> tag
+function geocodeJSONP(address) {
+  return new Promise((resolve) => {
+    const cb = '_nom_' + Math.random().toString(36).slice(2);
+    const s = document.createElement('script');
+    const timer = setTimeout(() => { resolve(null); try { document.head.removeChild(s); } catch(e){} delete window[cb]; }, 5000);
+    window[cb] = (data) => {
+      clearTimeout(timer);
+      try { document.head.removeChild(s); } catch(e){}
+      delete window[cb];
+      resolve(data && data[0] ? { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) } : null);
+    };
+    s.src = `https://nominatim.openstreetmap.org/search?format=json&limit=1&json_callback=${cb}&q=${encodeURIComponent(address)}`;
+    document.head.appendChild(s);
+  });
+}
 
 function renderMapPage() {
   const mapEl = document.getElementById('map-page-map');
@@ -3190,6 +3208,9 @@ function renderMapPage() {
     });
   }
 
+  // Invalidate size in case the pane was hidden when map was created
+  setTimeout(() => _leafletMap && _leafletMap.invalidateSize(), 100);
+
   const visible = filteredOrders().filter(o => o.address && o.status !== 'cancelled');
   if (!visible.length) {
     statusEl.textContent = 'No open orders with addresses';
@@ -3203,45 +3224,52 @@ function renderMapPage() {
   const markers = [];
   let done = 0;
 
+  function placeMarker(o, coords) {
+    if (!coords) return;
+    const color = STATUS_COLOR[o.status] || '#888';
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7]
+    });
+    const clientLine = o.client ? `<br><span style="color:var(--muted);font-size:12px">${esc(o.client)}</span>` : '';
+    const m = L.marker([coords.lat, coords.lon], { icon })
+      .addTo(_leafletMap)
+      .bindPopup(
+        `<strong style="font-size:13px">${esc(o.address)}</strong><br>` +
+        `<span style="color:${color};font-weight:600;font-size:12px">${STATUS_LABELS[o.status] || o.status}</span>` +
+        clientLine +
+        `<br><button onclick="openDetail('${o.id}');document.querySelector('.leaflet-popup-close-button')&&document.querySelector('.leaflet-popup-close-button').click()" ` +
+        `style="margin-top:8px;padding:4px 12px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">Open Order ↗</button>`
+      );
+    markers.push(m);
+  }
+
   async function geocodeNext(i) {
     if (i >= visible.length) {
       statusEl.style.display = 'none';
       if (markers.length) {
         const group = L.featureGroup(markers);
-        _leafletMap.fitBounds(group.getBounds().pad(0.15));
+        _leafletMap.fitBounds(group.getBounds().pad(0.2));
       }
       return;
     }
     const o = visible[i];
-    try {
-      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(o.address)}`, {
-        headers: { 'Accept-Language': 'en', 'User-Agent': 'AppraisalDesk/1.0' }
-      });
-      const data = await r.json();
-      if (data && data[0]) {
-        const { lat, lon } = data[0];
-        const color = STATUS_COLOR[o.status] || '#888';
-        const icon = L.divIcon({
-          className: '',
-          html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
-          iconSize: [14, 14],
-          iconAnchor: [7, 7]
-        });
-        const m = L.marker([lat, lon], { icon })
-          .addTo(_leafletMap)
-          .bindPopup(`<strong style="font-size:13px">${o.address}</strong><br><span style="color:${color};font-weight:600">${STATUS_LABELS[o.status] || o.status}</span>${o.client ? '<br>' + o.client : ''}<br><button onclick="openDetail('${o.id}');this.closest('.leaflet-popup').querySelector('.leaflet-popup-close-button').click()" style="margin-top:8px;padding:4px 12px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">Open Order</button>`);
-        markers.push(m);
-      }
-    } catch(e) {}
+    const addr = o.address.trim();
+    let coords = _geocodeCache[addr];
+    if (!coords) {
+      coords = await geocodeJSONP(addr);
+      if (coords) _geocodeCache[addr] = coords;
+    }
+    placeMarker(o, coords);
     done++;
     statusEl.textContent = `Locating… ${done}/${visible.length}`;
-    // Nominatim rate limit: 1 req/sec
-    setTimeout(() => geocodeNext(i + 1), 1100);
+    // Nominatim fair-use: 1 req/sec
+    setTimeout(() => geocodeNext(i + 1), 1200);
   }
 
   geocodeNext(0);
-  // Invalidate size in case the pane was hidden when map was created
-  setTimeout(() => _leafletMap && _leafletMap.invalidateSize(), 100);
 }
 
 
