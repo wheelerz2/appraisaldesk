@@ -3449,12 +3449,23 @@ function openDetail(id) {
       const mapSrc  = `https://maps.google.com/maps?q=${q}&t=k&z=18&output=embed`;
       const svUrl   = `https://www.google.com/maps?q=${q}&layer=c`;
       const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${q}`;
+      const zolaUrl = `https://zola.planning.nyc.gov/#search=address&q=${q}`;
+      const pipUrl  = `https://propertyinformationportal.nyc.gov/parcels/search?searchType=address&address=${q}`;
+      const btnStyle = `background:rgba(0,0,0,.65);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;text-decoration:none;backdrop-filter:blur(4px)`;
       return `<div style="margin:-4px -4px 0;border-radius:8px;overflow:hidden;border:1px solid var(--border);position:relative">
         <iframe src="${mapSrc}" style="width:100%;height:160px;display:block;border:0" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
-        <div style="position:absolute;bottom:8px;right:8px;display:flex;gap:6px">
-          <a href="${svUrl}" target="_blank" style="background:rgba(0,0,0,.65);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;text-decoration:none;backdrop-filter:blur(4px)">🚶 Street View</a>
-          <a href="${mapsUrl}" target="_blank" style="background:rgba(0,0,0,.65);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;text-decoration:none;backdrop-filter:blur(4px)">↗ Open Map</a>
+        <div style="position:absolute;bottom:8px;right:8px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+          <a href="${svUrl}" target="_blank" style="${btnStyle}">🚶 Street View</a>
+          <a href="${mapsUrl}" target="_blank" style="${btnStyle}">↗ Maps</a>
         </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <a href="${zolaUrl}" target="_blank" style="flex:1;min-width:120px;display:flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:var(--ink);font-size:12px;font-weight:600;background:var(--card)">
+          <span style="font-size:16px">🗺</span> Zola NYC
+        </a>
+        <a href="${pipUrl}" target="_blank" style="flex:1;min-width:120px;display:flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:var(--ink);font-size:12px;font-weight:600;background:var(--card)">
+          <span style="font-size:16px">🏛</span> Property Portal
+        </a>
       </div>`;
     })()}
     <div class="detail-section">
