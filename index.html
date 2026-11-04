@@ -2,6 +2,12 @@
 <title>AppraisalDesk</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Outfit:wght@400;500;600&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+/* Leaflet 1.9.4 core CSS — inlined to satisfy CSP */
+.leaflet-pane,.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow,.leaflet-tile-container,.leaflet-pane>svg,.leaflet-pane>canvas,.leaflet-zoom-box,.leaflet-image-layer,.leaflet-layer{position:absolute;left:0;top:0}.leaflet-container{overflow:hidden}.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow{-webkit-user-select:none;-moz-user-select:none;user-select:none;-webkit-user-drag:none}.leaflet-tile::selection{background:transparent}.leaflet-safari .leaflet-tile{image-rendering:-webkit-optimize-contrast}.leaflet-safari .leaflet-tile-container{width:1600px;height:1600px;-webkit-transform-origin:0 0}.leaflet-marker-icon,.leaflet-marker-shadow{display:block}.leaflet-container .leaflet-overlay-pane svg{max-width:none!important;max-height:none!important}.leaflet-container .leaflet-marker-pane img,.leaflet-container .leaflet-shadow-pane img,.leaflet-container .leaflet-tile-pane img,.leaflet-container img.leaflet-image-layer,.leaflet-container .leaflet-tile{max-width:none!important;max-height:none!important;width:auto;padding:0}.leaflet-container.leaflet-touch-zoom{-ms-touch-action:pan-x pan-y;touch-action:pan-x pan-y}.leaflet-container.leaflet-touch-drag{-ms-touch-action:pinch-zoom;touch-action:none;touch-action:pinch-zoom}.leaflet-container.leaflet-touch-drag.leaflet-touch-zoom{-ms-touch-action:none;touch-action:none}.leaflet-container{-webkit-tap-highlight-color:transparent}.leaflet-container a{-webkit-tap-highlight-color:rgba(51,181,229,.4)}.leaflet-tile{filter:inherit;visibility:hidden}.leaflet-tile-loaded{visibility:inherit}.leaflet-zoom-box{width:0;height:0;-moz-box-sizing:border-box;box-sizing:border-box;z-index:800}.leaflet-overlay-pane svg{-moz-user-select:none}.leaflet-pane{z-index:400}.leaflet-tile-pane{z-index:200}.leaflet-overlay-pane{z-index:400}.leaflet-shadow-pane{z-index:500}.leaflet-marker-pane{z-index:600}.leaflet-tooltip-pane{z-index:650}.leaflet-popup-pane{z-index:700}.leaflet-map-pane canvas{z-index:100}.leaflet-map-pane svg{z-index:200}.leaflet-vml-shape{width:1px;height:1px}.lvml{behavior:url(#default#VML);display:inline-block;position:absolute}.leaflet-control{position:relative;z-index:800;pointer-events:visiblePainted;pointer-events:auto}.leaflet-top,.leaflet-bottom{position:absolute;z-index:1000;pointer-events:none}.leaflet-top{top:0}.leaflet-right{right:0}.leaflet-bottom{bottom:0}.leaflet-left{left:0}.leaflet-control{float:left;clear:both}.leaflet-right .leaflet-control{float:right}.leaflet-top .leaflet-control{margin-top:10px}.leaflet-bottom .leaflet-control{margin-bottom:10px}.leaflet-left .leaflet-control{margin-left:10px}.leaflet-right .leaflet-control{margin-right:10px}.leaflet-fade-anim .leaflet-popup{opacity:0;-webkit-transition:opacity .2s linear;-moz-transition:opacity .2s linear;transition:opacity .2s linear}.leaflet-fade-anim .leaflet-map-pane .leaflet-popup{opacity:1}.leaflet-zoom-animated{-webkit-transform-origin:0 0;-ms-transform-origin:0 0;transform-origin:0 0}.leaflet-zoom-anim .leaflet-zoom-animated{will-change:transform}.leaflet-zoom-anim .leaflet-zoom-animated{-webkit-transition:-webkit-transform .25s cubic-bezier(0,0,.25,1);-moz-transition:-moz-transform .25s cubic-bezier(0,0,.25,1);transition:transform .25s cubic-bezier(0,0,.25,1)}.leaflet-pan-anim .leaflet-tile,.leaflet-zoom-anim .leaflet-tile{-webkit-transition:none;-moz-transition:none;transition:none}.leaflet-zoom-anim .leaflet-zoom-animated{pointer-events:none}.leaflet-dragging .leaflet-grab,.leaflet-dragging .leaflet-grab .leaflet-interactive,.leaflet-dragging .leaflet-marker-draggable{cursor:move;cursor:-webkit-grabbing;cursor:-moz-grabbing;cursor:grabbing}.leaflet-grab{cursor:-webkit-grab;cursor:-moz-grab;cursor:grab}.leaflet-crosshair,.leaflet-crosshair .leaflet-interactive{cursor:crosshair}.leaflet-popup-pane,.leaflet-control{cursor:auto}.leaflet-interactive{cursor:pointer}.leaflet-container .leaflet-interactive{outline:0!important}.leaflet-bar{box-shadow:0 1px 5px rgba(0,0,0,.65);border-radius:4px}.leaflet-bar a{background-color:#fff;border-bottom:1px solid #ccc;width:26px;height:26px;line-height:26px;display:block;text-align:center;text-decoration:none;color:#000}.leaflet-bar a,.leaflet-control-layers-toggle{background-position:50% 50%;background-repeat:no-repeat;display:block}.leaflet-bar a:hover,.leaflet-bar a:focus{background-color:#f4f4f4}.leaflet-bar a:first-child{border-top-left-radius:4px;border-top-right-radius:4px}.leaflet-bar a:last-child{border-bottom-left-radius:4px;border-bottom-right-radius:4px;border-bottom:none}.leaflet-bar a.leaflet-disabled{cursor:default;background-color:#f4f4f4;color:#bbb}.leaflet-touch .leaflet-bar a{width:30px;height:30px;line-height:30px}.leaflet-touch .leaflet-bar a:first-child{border-top-left-radius:2px;border-top-right-radius:2px}.leaflet-touch .leaflet-bar a:last-child{border-bottom-left-radius:2px;border-bottom-right-radius:2px}.leaflet-control-zoom-in,.leaflet-control-zoom-out{font:bold 18px 'Lucida Console',Monaco,monospace;text-indent:1px}.leaflet-touch .leaflet-control-zoom-in,.leaflet-touch .leaflet-control-zoom-out{font-size:22px}.leaflet-control-layers{box-shadow:0 1px 5px rgba(0,0,0,.4);background:#fff;border-radius:5px}.leaflet-control-layers-toggle{background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAQAAAADQ4RFAAABaklEQVR4AcXWv2rDMBAG8O/MBuM3yOIXKGTOVNpBXiRLaM/u7uLBYPhLepFXSR+hJ3SIGzqkYMjQF0h3ECSD00CGQC/Qu+4G3cHd3d3dHd3d3V0GAAAAAAB8gW8gAAAAAACw1AkCAAAAAADAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABw1QkCAAAAAAAAAAAAAAAAAAAAwFQnCAAAAAAAAAAAAAAAAAAAAMBUJwgAAAAAAAAAAAAAAAAAAMBVJwgAAAAAAAAAAAAAAAAAAMBWJwgAAAAAAAAAAAAAAAAAAMBXJwgAAAAAAAAAAAAAAAAAAMBYJwgAAAAAAAAAAAAAAAAAAMBZJwgAAAAAAAAAAAAAAAAAAMBaJwgAAAAAAAAAAAAAAAAAAMBbJwgAAAAAAAAAAAAAAAAAAMBcJwgAAAAAAAAAAAAAAAAAAMBdJwgAAAAAAAAAAAAAAAAAAMBeJwgAAAAAAAAAAAAAAAAAAMBfJwgAAAAAAAAAAAAAAAAAAMBgJwgAAAAAAAAAAAAAAAAAAMBhJwgAAAAAAAAAAAAAAAAAAMBiJwgAAAAAAAAAAAAAAAAAAMBjJwgAAAAAAAAAAAAAAAAAAMBkJwgAAAAAAAAAAAAAAAAAAMBlJwg=);width:36px;height:36px}.leaflet-retina .leaflet-control-layers-toggle{background-size:26px 26px}.leaflet-touch .leaflet-control-layers-toggle{width:44px;height:44px}.leaflet-control-layers .leaflet-control-layers-list,.leaflet-control-layers-expanded .leaflet-control-layers-toggle{display:none}.leaflet-control-layers-expanded .leaflet-control-layers-list{display:block;position:relative}.leaflet-control-layers-expanded{padding:6px 10px 6px 6px;color:#333;background:#fff}.leaflet-control-layers-scrollbar{overflow-y:scroll;overflow-x:hidden;padding-right:5px}.leaflet-control-layers-selector{margin-top:2px;position:relative;top:1px}.leaflet-control-layers label{display:block;font-size:13px;font-size:1.08333em}.leaflet-control-layers-separator{height:0;border-top:1px solid #ddd;margin:5px -10px 5px -6px}.leaflet-default-icon-path{background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABkAAAApCAYAAADAk4LOAAAFgUlEQVR4Aa1XA5BjWRTN2oW17d3YaZtr2962HaZjqד)}
+.leaflet-container{background:#ddd;outline-offset:1px}.leaflet-container a.leaflet-active{outline:2px solid orange}.leaflet-zoom-box{border:2px dotted #38f;background:rgba(255,255,255,.5)}.leaflet-container{font-family:Helvetica Neue,Arial,Helvetica,sans-serif;font-size:.75rem;font-size:12px;line-height:1.5}.leaflet-bar a,.leaflet-control-layers-toggle{background-position:50% 50%;background-repeat:no-repeat;display:block}.leaflet-popup{position:absolute;text-align:center;margin-bottom:20px}.leaflet-popup-content-wrapper{padding:1px;text-align:left;border-radius:12px}.leaflet-popup-content{margin:13px 24px 13px 20px;line-height:1.3;min-height:1px}.leaflet-popup-content p{margin:17px 0}.leaflet-popup-tip-container{width:40px;height:20px;position:absolute;left:50%;margin-left:-20px;overflow:hidden;pointer-events:none}.leaflet-popup-tip{width:17px;height:17px;padding:1px;margin:-10px auto 0;-webkit-transform:rotate(45deg);-moz-transform:rotate(45deg);-ms-transform:rotate(45deg);transform:rotate(45deg)}.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#fff;color:#333;box-shadow:0 3px 14px rgba(0,0,0,.4)}.leaflet-container a.leaflet-popup-close-button{position:absolute;top:0;right:0;border:none;text-align:center;width:24px;height:24px;font:16px/24px Tahoma,Verdana,sans-serif;color:#757575;text-decoration:none;background:transparent}.leaflet-container a.leaflet-popup-close-button:hover,.leaflet-container a.leaflet-popup-close-button:focus{color:#585858}.leaflet-popup-scrolled{overflow:auto}.leaflet-oldie .leaflet-popup-content-wrapper{-ms-zoom:1}.leaflet-oldie .leaflet-popup-tip{width:24px;-ms-filter:"progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678)";filter:progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678)}.leaflet-oldie .leaflet-control-zoom,.leaflet-oldie .leaflet-control-layers,.leaflet-oldie .leaflet-popup-content-wrapper,.leaflet-oldie .leaflet-popup-tip{zoom:1}.leaflet-div-icon{background:#fff;border:1px solid #666}.leaflet-tooltip{position:absolute;padding:6px;background-color:#fff;border:1px solid #fff;border-radius:3px;color:#222;white-space:nowrap;-webkit-user-select:none;-moz-user-select:none;user-select:none;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.4)}.leaflet-tooltip.leaflet-interactive{cursor:pointer;pointer-events:auto}.leaflet-tooltip-top:before,.leaflet-tooltip-bottom:before,.leaflet-tooltip-left:before,.leaflet-tooltip-right:before{position:absolute;pointer-events:none;border:6px solid transparent;background:transparent;content:""}.leaflet-tooltip-bottom:before{top:0;left:50%;margin-left:-6px;margin-top:-12px;border-bottom-color:#fff}.leaflet-tooltip-top:before{bottom:0;left:50%;margin-left:-6px;margin-bottom:-12px;border-top-color:#fff}.leaflet-tooltip-left:before{top:50%;right:0;margin-top:-6px;margin-right:-12px;border-left-color:#fff}.leaflet-tooltip-right:before{top:50%;left:0;margin-top:-6px;margin-left:-12px;border-right-color:#fff}
+</style>
 <style>
 /* ── TOKENS ── */
 :root {
@@ -27,6 +33,7 @@
   --s-questionnaire: #be185d;
   --s-complete: #16a34a;
   --s-cancelled: #9ca3af;
+  --s-onhold: #d97706;
 
   --nav-h: 56px;
   --sidebar-w: 220px;
@@ -200,15 +207,17 @@ input, select, textarea { font-family: inherit; font-size: inherit; color: inher
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 16px 20px;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 4px 16px;
+  padding: 12px 16px;
   cursor: pointer;
   transition: box-shadow .15s, border-color .15s;
   box-shadow: var(--shadow);
 }
 .order-card:hover { border-color: var(--accent); box-shadow: var(--shadow-lg); }
+.order-card-body {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 16px;
+}
 .order-addr {
   font-weight: 600;
   font-size: 15px;
@@ -218,7 +227,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; color: inher
   font-size: 12px;
   color: var(--muted);
   grid-column: 1;
-  display: flex; gap: 12px; flex-wrap: wrap;
+  display: flex; gap: 8px; flex-wrap: wrap;
 }
 .order-meta span::before { content: ''; }
 .order-pill {
@@ -240,6 +249,12 @@ input, select, textarea { font-family: inherit; font-size: inherit; color: inher
 .pill-questionnaire { background: var(--s-questionnaire); }
 .pill-complete    { background: var(--s-complete); }
 .pill-cancelled   { background: var(--s-cancelled); }
+.pill-onhold      { background: var(--s-onhold); }
+
+/* ── MAP PAGE ── */
+#map-page { display: none; flex-direction: column; height: calc(100vh - var(--nav-h)); position: relative; }
+#map-page.active { display: flex; }
+#map-page-map { flex: 1; width: 100%; min-height: 0; }
 
 .overdue { border-left: 3px solid #dc2626; }
 .due-soon { border-left: 3px solid var(--gold); }
@@ -1651,6 +1666,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; color: inher
   <div id="nav-brand">Appraisal<span>Desk</span><small id="nav-version" style="font-size:10px;font-weight:400;opacity:.55;margin-left:6px;letter-spacing:.03em;font-family:inherit">v2.0</small></div>
   <div id="nav-tabs">
     <button class="nav-tab active" onclick="showPage('orders')">Orders</button>
+    <button class="nav-tab" onclick="showPage('map')">🗺 Map</button>
     <button class="nav-tab" onclick="showPage('calendar')">Calendar</button>
     <button class="nav-tab" onclick="showPage('appraisers')">Appraisers</button>
     <button class="nav-tab" onclick="showPage('companies')">Companies</button>
@@ -1708,6 +1724,12 @@ input, select, textarea { font-family: inherit; font-size: inherit; color: inher
       </div>
       <div id="orders-list"></div>
     </div>
+  </div>
+
+  <!-- ════════════ MAP PAGE ════════════ -->
+  <div class="page" id="map-page">
+    <div id="map-page-map" style="flex:1;width:100%;min-height:0"></div>
+    <div id="map-page-status" style="display:none;position:absolute;top:calc(var(--nav-h) + 12px);left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);color:#fff;font-size:13px;padding:6px 14px;border-radius:20px;z-index:1000;pointer-events:none"></div>
   </div>
 
   <!-- ════════════ CALENDAR PAGE ════════════ -->
@@ -2060,22 +2082,29 @@ input, select, textarea { font-family: inherit; font-size: inherit; color: inher
           <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:10px">
             <div>
               <div class="settings-row-label">Auto-Backup</div>
-              <div class="settings-row-desc">Automatically save a JSON data backup at a set interval — opens a save dialog each time so you choose the folder.</div>
+              <div class="settings-row-desc">Automatically save a JSON backup to a folder on your computer. Choose a folder once — backups write there silently with no dialog.</div>
             </div>
-            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-                <input type="checkbox" id="autobackup-enabled" style="accent-color:var(--accent);width:15px;height:15px" onchange="saveAutoBackupSettings()">
-                Enable auto-backup
-              </label>
-              <select id="autobackup-interval" onchange="saveAutoBackupSettings()" style="padding:5px 10px;border:1px solid var(--border);border-radius:7px;background:var(--paper);color:var(--ink);font-size:13px">
-                <option value="15">Every 15 minutes</option>
-                <option value="30" selected>Every 30 minutes</option>
-                <option value="60">Every hour</option>
-                <option value="120">Every 2 hours</option>
-                <option value="480">Every 8 hours</option>
-                <option value="1440">Daily</option>
-              </select>
-              <span id="autobackup-status" style="font-size:12px;color:var(--muted)"></span>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <button class="theme-btn" onclick="chooseBackupFolder()" style="font-size:13px">📁 Choose Folder…</button>
+                <span id="backup-folder-name" style="font-size:13px;color:var(--muted)">No folder chosen</span>
+                <button id="backup-folder-clear" hidden onclick="clearBackupFolder()" style="font-size:12px;padding:3px 10px;background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--muted)">✕ Clear</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                  <input type="checkbox" id="autobackup-enabled" style="accent-color:var(--accent);width:15px;height:15px" onchange="saveAutoBackupSettings()">
+                  Enable auto-backup
+                </label>
+                <select id="autobackup-interval" onchange="saveAutoBackupSettings()" style="padding:5px 10px;border:1px solid var(--border);border-radius:7px;background:var(--paper);color:var(--ink);font-size:13px">
+                  <option value="15">Every 15 minutes</option>
+                  <option value="30" selected>Every 30 minutes</option>
+                  <option value="60">Every hour</option>
+                  <option value="120">Every 2 hours</option>
+                  <option value="480">Every 8 hours</option>
+                  <option value="1440">Daily</option>
+                </select>
+                <span id="autobackup-status" style="font-size:12px;color:var(--muted)"></span>
+              </div>
             </div>
           </div>
 
@@ -3088,6 +3117,7 @@ const STATUS_LABELS = {
   review:        'Under Review',
   contract:      'Waiting on Contract',
   questionnaire: 'Waiting on Questionnaire',
+  onhold:        'On Hold',
   complete:      'Complete',
   cancelled:     'Cancelled',
 };
@@ -3098,6 +3128,7 @@ const STATUS_PILL = {
   review:        'pill-review',
   contract:      'pill-contract',
   questionnaire: 'pill-questionnaire',
+  onhold:        'pill-onhold',
   complete:      'pill-complete',
   cancelled:     'pill-cancelled',
 };
@@ -3108,6 +3139,7 @@ const STATUS_COLOR = {
   review:        'var(--s-review)',
   contract:      'var(--s-contract)',
   questionnaire: 'var(--s-questionnaire)',
+  onhold:        'var(--s-onhold)',
   complete:      'var(--s-complete)',
   cancelled:     'var(--s-cancelled)',
 };
@@ -3125,10 +3157,11 @@ function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(name + '-page').classList.add('active');
   document.querySelectorAll('.nav-tab').forEach((t, i) => {
-    const pages = ['orders','calendar','appraisers','companies','income','accounting','settings'];
+    const pages = ['orders','map','calendar','appraisers','companies','income','accounting','settings'];
     t.classList.toggle('active', pages[i] === name);
   });
   if (name === 'orders') { buildSidebarFilters(); renderOrders(); }
+  if (name === 'map') renderMapPage();
   if (name === 'calendar') renderCalendar();
   if (name === 'appraisers') { populateAppraisersSelect(); renderAppraisers(); }
   if (name === 'companies') renderCompanies();
@@ -3136,6 +3169,81 @@ function showPage(name) {
   if (name === 'accounting') renderAccounting();
   if (name === 'settings') renderSettings();
 }
+
+let _leafletMap = null;
+
+function renderMapPage() {
+  const mapEl = document.getElementById('map-page-map');
+  const statusEl = document.getElementById('map-page-status');
+
+  // Initialize Leaflet map once
+  if (!_leafletMap) {
+    _leafletMap = L.map(mapEl).setView([40.7128, -74.006], 11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19
+    }).addTo(_leafletMap);
+  } else {
+    // Clear old markers
+    _leafletMap.eachLayer(layer => {
+      if (layer instanceof L.Marker) _leafletMap.removeLayer(layer);
+    });
+  }
+
+  const visible = filteredOrders().filter(o => o.address && o.status !== 'cancelled');
+  if (!visible.length) {
+    statusEl.textContent = 'No open orders with addresses';
+    statusEl.style.display = 'block';
+    return;
+  }
+
+  statusEl.textContent = `Locating ${visible.length} order${visible.length > 1 ? 's' : ''}…`;
+  statusEl.style.display = 'block';
+
+  const markers = [];
+  let done = 0;
+
+  async function geocodeNext(i) {
+    if (i >= visible.length) {
+      statusEl.style.display = 'none';
+      if (markers.length) {
+        const group = L.featureGroup(markers);
+        _leafletMap.fitBounds(group.getBounds().pad(0.15));
+      }
+      return;
+    }
+    const o = visible[i];
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(o.address)}`, {
+        headers: { 'Accept-Language': 'en', 'User-Agent': 'AppraisalDesk/1.0' }
+      });
+      const data = await r.json();
+      if (data && data[0]) {
+        const { lat, lon } = data[0];
+        const color = STATUS_COLOR[o.status] || '#888';
+        const icon = L.divIcon({
+          className: '',
+          html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+          iconSize: [14, 14],
+          iconAnchor: [7, 7]
+        });
+        const m = L.marker([lat, lon], { icon })
+          .addTo(_leafletMap)
+          .bindPopup(`<strong style="font-size:13px">${o.address}</strong><br><span style="color:${color};font-weight:600">${STATUS_LABELS[o.status] || o.status}</span>${o.client ? '<br>' + o.client : ''}<br><button onclick="openDetail('${o.id}');this.closest('.leaflet-popup').querySelector('.leaflet-popup-close-button').click()" style="margin-top:8px;padding:4px 12px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">Open Order</button>`);
+        markers.push(m);
+      }
+    } catch(e) {}
+    done++;
+    statusEl.textContent = `Locating… ${done}/${visible.length}`;
+    // Nominatim rate limit: 1 req/sec
+    setTimeout(() => geocodeNext(i + 1), 1100);
+  }
+
+  geocodeNext(0);
+  // Invalidate size in case the pane was hidden when map was created
+  setTimeout(() => _leafletMap && _leafletMap.invalidateSize(), 100);
+}
+
 
 // ══════════════════════════════════════════
 // ORDERS: FILTER + SORT + RENDER
@@ -3215,16 +3323,18 @@ function renderOrders() {
     if (o.fee)      metas.push('$' + o.fee);
     if (o.appraiserId) metas.push(apName(o.appraiserId));
     return `<div class="${cardClass}" onclick="openDetail('${o.id}')">
-      <div class="order-addr">${esc(o.address)}</div>
-      <div class="order-meta">${metas.map(m => `<span>${esc(m)}</span>`).join('')}</div>
-      <div class="order-pill ${STATUS_PILL[o.status]}">${STATUS_LABELS[o.status]}</div>
+      <div class="order-card-body">
+        <div class="order-addr">${esc(o.address)}</div>
+        <div class="order-meta">${metas.map(m => `<span>${esc(m)}</span>`).join('')}</div>
+        <div class="order-pill ${STATUS_PILL[o.status]}">${STATUS_LABELS[o.status]}</div>
+      </div>
     </div>`;
   }).join('');
 }
 
 function buildSidebarFilters() {
   // Status
-  const allStatuses = ['all','__open__','new','inspection','inspected','review','contract','questionnaire','complete','cancelled'];
+  const allStatuses = ['all','__open__','new','inspection','inspected','review','contract','questionnaire','onhold','complete','cancelled'];
   const statusEl = document.getElementById('status-filters');
   const counts = {};
   orders.forEach(o => { counts[o.status] = (counts[o.status]||0) + 1; });
@@ -3304,6 +3414,21 @@ function openDetail(id) {
 
   const body = document.getElementById('detail-body');
   body.innerHTML = `
+    ${(function(){
+      const addr = (o.address || '').trim();
+      if (!addr) return '';
+      const q = encodeURIComponent(addr);
+      const mapSrc  = `https://maps.google.com/maps?q=${q}&t=k&z=18&output=embed`;
+      const svUrl   = `https://www.google.com/maps?q=${q}&layer=c`;
+      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${q}`;
+      return `<div style="margin:-4px -4px 0;border-radius:8px;overflow:hidden;border:1px solid var(--border);position:relative">
+        <iframe src="${mapSrc}" style="width:100%;height:160px;display:block;border:0" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+        <div style="position:absolute;bottom:8px;right:8px;display:flex;gap:6px">
+          <a href="${svUrl}" target="_blank" style="background:rgba(0,0,0,.65);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;text-decoration:none;backdrop-filter:blur(4px)">🚶 Street View</a>
+          <a href="${mapsUrl}" target="_blank" style="background:rgba(0,0,0,.65);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;text-decoration:none;backdrop-filter:blur(4px)">↗ Open Map</a>
+        </div>
+      </div>`;
+    })()}
     <div class="detail-section">
       <h5>Status</h5>
       <div class="status-selector">
@@ -7517,6 +7642,7 @@ function renderSettings() {
   updateThemeBtns(s.theme || 'system');
   loadFirmInfo();
   renderInvoiceSections();
+  updateBackupFolderLabel();
   // Update Supabase status
   const lbl = document.getElementById('sb-status-label');
   if (lbl) {
@@ -7541,13 +7667,122 @@ function renderSettings() {
 // SETTINGS — DATA / BACKUP
 // ══════════════════════════════════════════
 let autoBackupTimer = null;
+let _backupDirHandle = null; // File System Access API directory handle
 
-async function exportDatabase(silent) {
-  await saveJsonToHardDrive();
+// Try to restore a saved directory handle from IndexedDB
+(async function restoreBackupDir() {
+  try {
+    const db = await new Promise((res, rej) => {
+      const r = indexedDB.open('ad_backup', 1);
+      r.onupgradeneeded = e => e.target.result.createObjectStore('handles');
+      r.onsuccess = e => res(e.target.result);
+      r.onerror = rej;
+    });
+    const tx = db.transaction('handles', 'readonly');
+    const req = tx.objectStore('handles').get('backupDir');
+    req.onsuccess = async () => {
+      if (!req.result) return;
+      try {
+        // Check permission is still granted
+        const perm = await req.result.queryPermission({ mode: 'readwrite' });
+        if (perm === 'granted') {
+          _backupDirHandle = req.result;
+          updateBackupFolderLabel();
+        }
+      } catch(e) {}
+    };
+  } catch(e) {}
+})();
+
+async function saveBackupDirHandle(handle) {
+  try {
+    const db = await new Promise((res, rej) => {
+      const r = indexedDB.open('ad_backup', 1);
+      r.onupgradeneeded = e => e.target.result.createObjectStore('handles');
+      r.onsuccess = e => res(e.target.result);
+      r.onerror = rej;
+    });
+    const tx = db.transaction('handles', 'readwrite');
+    tx.objectStore('handles').put(handle, 'backupDir');
+  } catch(e) {}
 }
 
-function manualBackupNow() {
-  saveJsonToHardDrive();
+async function chooseBackupFolder() {
+  if (!window.showDirectoryPicker) {
+    toast('⚠ Your browser does not support folder selection. Use Chrome or Edge on desktop.');
+    return;
+  }
+  try {
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'documents' });
+    _backupDirHandle = handle;
+    await saveBackupDirHandle(handle);
+    updateBackupFolderLabel();
+    toast('✅ Backup folder set: ' + handle.name);
+  } catch(e) {
+    if (e.name !== 'AbortError') toast('⚠ Could not access folder: ' + (e.message || e));
+  }
+}
+
+function updateBackupFolderLabel() {
+  const el = document.getElementById('backup-folder-name');
+  if (!el) return;
+  el.textContent = _backupDirHandle ? '📁 ' + _backupDirHandle.name : 'No folder chosen';
+  el.style.color = _backupDirHandle ? 'var(--sage)' : 'var(--muted)';
+  const btn = document.getElementById('backup-folder-clear');
+  if (btn) btn.hidden = !_backupDirHandle;
+}
+
+async function clearBackupFolder() {
+  _backupDirHandle = null;
+  try {
+    const db = await new Promise((res, rej) => {
+      const r = indexedDB.open('ad_backup', 1);
+      r.onupgradeneeded = e => e.target.result.createObjectStore('handles');
+      r.onsuccess = e => res(e.target.result);
+      r.onerror = rej;
+    });
+    const tx = db.transaction('handles', 'readwrite');
+    tx.objectStore('handles').delete('backupDir');
+  } catch(e) {}
+  updateBackupFolderLabel();
+  toast('Backup folder cleared');
+}
+
+// Write silently to the chosen folder (no dialog)
+async function writeBackupToFolder() {
+  if (!_backupDirHandle) return false;
+  try {
+    // Re-request permission if needed
+    const perm = await _backupDirHandle.requestPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') { toast('⚠ Folder permission denied — backup skipped'); return false; }
+    const payload = { exportedAt: new Date().toISOString(), version: 1, orders, appraisers, amcs, lenders };
+    const json = JSON.stringify(payload, null, 2);
+    const date = new Date().toISOString().slice(0,10);
+    const fname = `AppraisalDesk_backup_${date}.json`;
+    const fileHandle = await _backupDirHandle.getFileHandle(fname, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(json);
+    await writable.close();
+    saveSettings({ lastBackup: new Date().toISOString() });
+    updateLastBackupLabel();
+    return true;
+  } catch(e) {
+    console.warn('Auto-backup to folder failed:', e);
+    return false;
+  }
+}
+
+async function exportDatabase(silent) {
+  await saveJsonToHardDrive(silent);
+}
+
+async function manualBackupNow() {
+  // If folder is set, write there silently; otherwise open save dialog
+  if (_backupDirHandle) {
+    const ok = await writeBackupToFolder();
+    if (ok) { toast('💾 Backup saved to ' + _backupDirHandle.name); return; }
+  }
+  saveJsonToHardDrive(false);
 }
 
 // Save full app HTML + embedded data — opens in new tab, use Ctrl+S / File→Save As
@@ -7688,7 +7923,11 @@ function setupAutoBackup() {
   const s = loadSettings();
   const ab = s.autoBackup || {};
   if (ab.enabled && ab.interval) {
-    autoBackupTimer = setInterval(() => {
+    autoBackupTimer = setInterval(async () => {
+      if (_backupDirHandle) {
+        const ok = await writeBackupToFolder();
+        if (ok) { toast('💾 Auto-backup saved to ' + _backupDirHandle.name); return; }
+      }
       exportDatabase(true);
       toast('💾 Auto-backup saved');
     }, ab.interval * 60 * 1000);
