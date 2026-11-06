@@ -3348,6 +3348,7 @@ function renderOrders() {
     }
     const metas = [];
     if (o.type)     metas.push(o.type);
+    if (o.propType) metas.push(o.propType);
     if (o.purpose)  metas.push(o.purpose);
     if (o.lender)   metas.push(o.lender);
     if (o.amc)      metas.push(o.amc);
