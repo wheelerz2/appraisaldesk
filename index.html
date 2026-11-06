@@ -6618,8 +6618,8 @@ function renderAppraisalPayments() {
   sel.innerHTML = '<option value="all">All Appraisers</option>' +
     apList.map(a => `<option value="${a.id}"${currentVal===a.id?' selected':''}>${esc(a.name)}</option>`).join('');
 
-  // All orders with a fee and an appraiser assigned
-  const apOrders = orders.filter(o => o.fee > 0 && o.appraiserId);
+  // Only completed orders with a fee and an appraiser assigned
+  const apOrders = orders.filter(o => o.fee > 0 && o.appraiserId && o.status === 'complete');
   const filtered = apOrders.filter(o => {
     if (sel.value !== 'all' && o.appraiserId !== sel.value) return false;
     if (apPayFilter === 'unpaid') return !o.appraiserPaid;
@@ -6777,7 +6777,7 @@ function printAppraisalPayments() {
   const filterLabel = apPayFilter === 'unpaid' ? 'Unpaid' : apPayFilter === 'paid' ? 'Paid' : 'All';
   const dateStr = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 
-  const apOrders = orders.filter(o => o.fee > 0 && o.appraiserId);
+  const apOrders = orders.filter(o => o.fee > 0 && o.appraiserId && o.status === 'complete');
   const rows = apOrders.filter(o => {
     if (sel && sel.value !== 'all' && o.appraiserId !== sel.value) return false;
     if (apPayFilter === 'unpaid') return !o.appraiserPaid;
@@ -6830,7 +6830,7 @@ function emailAppraisalPayments() {
   const apLabel = sel ? sel.options[sel.selectedIndex]?.text : 'All Appraisers';
   const filterLabel = apPayFilter === 'unpaid' ? 'Unpaid' : apPayFilter === 'paid' ? 'Paid' : 'All';
 
-  const apOrders = orders.filter(o => o.fee > 0 && o.appraiserId);
+  const apOrders = orders.filter(o => o.fee > 0 && o.appraiserId && o.status === 'complete');
   const allForAp = apOrders.filter(o => sel.value === 'all' || o.appraiserId === sel.value);
   const totalEarn  = allForAp.reduce((s,o) => s + Math.round(o.fee * ((o.feeSplit!=null?o.feeSplit:100)/100)), 0);
   const paidEarn   = allForAp.filter(o=>o.appraiserPaid).reduce((s,o) => s + Math.round(o.fee * ((o.feeSplit!=null?o.feeSplit:100)/100)), 0);
