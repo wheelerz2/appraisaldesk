@@ -4548,13 +4548,15 @@ function saveAppraiser() {
     zip:          document.getElementById('ap-zip').value.trim(),
     ssn:          document.getElementById('ap-ssn').value.trim(),
   };
+  let savedAppraiser;
   if (editingAppraiserId) {
     const idx = appraisers.findIndex(x => x.id === editingAppraiserId);
-    if (idx > -1) appraisers[idx] = { ...appraisers[idx], ...data };
+    if (idx > -1) { appraisers[idx] = { ...appraisers[idx], ...data }; savedAppraiser = appraisers[idx]; }
   } else {
-    appraisers.push({ id: uid(), ...data });
+    savedAppraiser = { id: uid(), ...data };
+    appraisers.push(savedAppraiser);
   }
-  _sbUpsertAppraiser(a);
+  _sbUpsertAppraiser(savedAppraiser);
   closeApModal();
   renderAppraisers();
   toast(editingAppraiserId ? 'Appraiser updated' : 'Appraiser added');
