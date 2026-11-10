@@ -2781,8 +2781,17 @@ function _loadSavedSession() {
 }
 
 async function _fetchUserProfile() {
-  // Query appraiser_users table to get role and appraiser_id
-  const url = _getSbUrl().replace(/\/$/, '') + '/rest/v1/appraiser_users?select=*';
+  // Get the logged-in user's email from Supabase Auth
+  const userRes = await fetch(_getSbUrl().replace(/\/$/, '') + '/auth/v1/user', {
+    headers: { 'apikey': _getSbKey(), 'Authorization': 'Bearer ' + _sbSessionToken }
+  });
+  if (!userRes.ok) throw new Error('Auth user fetch failed: ' + userRes.status);
+  const userInfo = await userRes.json();
+  const email = userInfo.email;
+  if (!email) throw new Error('No email in auth session');
+
+  // Query appraiser_users filtered by this user's email
+  const url = _getSbUrl().replace(/\/$/, '') + '/rest/v1/appraiser_users?auth_email=eq.' + encodeURIComponent(email) + '&select=*';
   const res = await fetch(url, { method: 'GET', headers: _sbHeaders() });
   if (!res.ok) throw new Error('Profile fetch failed: ' + res.status);
   const rows = await res.json();
