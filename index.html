@@ -108,6 +108,11 @@ input, select, textarea { font-family: inherit; font-size: inherit; color: inher
 }
 .nav-tab:hover { color: var(--ink); background: var(--cream); }
 .nav-tab.active { color: var(--ink); background: var(--cream); border-bottom: 2px solid var(--accent); }
+/* Auth: admin-only elements are hidden until body.is-admin is set */
+.admin-only { display: none !important; }
+body.is-admin .nav-tab.admin-only { display: inline-flex !important; }
+body.is-admin button.admin-only { display: inline-flex !important; }
+body.is-admin .admin-only { display: block !important; }
 #nav-actions { display: flex; gap: 8px; align-items: center; }
 #btn-new-order {
   padding: 7px 16px;
@@ -1668,14 +1673,16 @@ input, select, textarea { font-family: inherit; font-size: inherit; color: inher
     <button class="nav-tab active" onclick="showPage('orders')">Orders</button>
     <button class="nav-tab" onclick="showPage('map')">🗺 Map</button>
     <button class="nav-tab" onclick="showPage('calendar')">Calendar</button>
-    <button class="nav-tab" onclick="showPage('appraisers')">Appraisers</button>
-    <button class="nav-tab" onclick="showPage('companies')">Companies</button>
-    <button class="nav-tab" onclick="showPage('income')">Income</button>
+    <button class="nav-tab admin-only" onclick="showPage('appraisers')">Appraisers</button>
+    <button class="nav-tab admin-only" onclick="showPage('companies')">Companies</button>
+    <button class="nav-tab admin-only" onclick="showPage('income')">Income</button>
     <button class="nav-tab" onclick="showPage('accounting')">Accounting</button>
-    <button class="nav-tab" onclick="showPage('settings')">⚙ Settings</button>
+    <button class="nav-tab admin-only" onclick="showPage('settings')">⚙ Settings</button>
   </div>
   <div id="nav-actions">
-    <button id="btn-new-order" onclick="openOrderModal(null)">+ New Order</button>
+    <button id="btn-new-order" class="admin-only" onclick="openOrderModal(null)">+ New Order</button>
+    <span id="nav-user-info" style="font-size:12px;color:var(--muted);margin-right:4px"></span>
+    <button onclick="signOut()" style="font-size:12px;padding:5px 12px;background:transparent;border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--muted)">Sign Out</button>
   </div>
 </nav>
 
@@ -1702,7 +1709,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; color: inher
           <option>Other</option>
         </select>
       </div>
-      <div class="sidebar-section">
+      <div class="sidebar-section admin-only">
         <h4>Appraiser</h4>
         <select class="sidebar-select" id="appraiser-filter" onchange="filters.appraiser=this.value;renderOrders()">
           <option value="all">All Appraisers</option>
@@ -2736,11 +2743,127 @@ function _getSbKey() {
     return (k && !k.startsWith('sb_publishable_')) ? k : SB_DEFAULT_KEY;
   } catch(e) { return SB_DEFAULT_KEY; }
 }
+// ── Auth state ───────────────────────────────────────────────────────────────
+let _sbSessionToken = null;   // JWT access token from Supabase Auth
+let _sbRefreshToken = null;   // refresh token
+let currentUser     = null;   // { email, appraiser_id, is_admin }
+let isAdmin         = false;
+let currentAppraiserId = null;
+
+const SB_SESSION_KEY = 'ad_sb_session';
+
+function _saveSession(access, refresh) {
+  _sbSessionToken  = access;
+  _sbRefreshToken  = refresh;
+  try { localStorage.setItem(SB_SESSION_KEY, JSON.stringify({ access, refresh })); } catch(e) {}
+}
+function _clearSession() {
+  _sbSessionToken  = null;
+  _sbRefreshToken  = null;
+  currentUser      = null;
+  isAdmin          = false;
+  currentAppraiserId = null;
+  try { localStorage.removeItem(SB_SESSION_KEY); } catch(e) {}
+}
+function _loadSavedSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SB_SESSION_KEY) || 'null');
+    if (s && s.access) { _sbSessionToken = s.access; _sbRefreshToken = s.refresh; return true; }
+  } catch(e) {}
+  return false;
+}
+
+async function _fetchUserProfile() {
+  // Query appraiser_users table to get role and appraiser_id
+  const url = _getSbUrl().replace(/\/$/, '') + '/rest/v1/appraiser_users?select=*';
+  const res = await fetch(url, { method: 'GET', headers: _sbHeaders() });
+  if (!res.ok) throw new Error('Profile fetch failed: ' + res.status);
+  const rows = await res.json();
+  if (!rows || rows.length === 0) throw new Error('No user profile found');
+  const profile = rows[0];
+  currentUser        = profile;
+  isAdmin            = !!profile.is_admin;
+  currentAppraiserId = profile.appraiser_id;
+  _applyAuthUI();
+}
+
+function _applyAuthUI() {
+  // Toggle is-admin on body; CSS shows .admin-only only when body.is-admin present
+  document.body.classList.toggle('is-admin', isAdmin);
+  // Show logged-in user info
+  const info = document.getElementById('nav-user-info');
+  if (info && currentUser) info.textContent = currentUser.auth_email || '';
+}
+
+async function doLogin() {
+  const email    = (document.getElementById('login-email')?.value || '').trim();
+  const password = (document.getElementById('login-password')?.value || '').trim();
+  const errEl    = document.getElementById('login-error');
+  const btn      = document.getElementById('login-btn');
+  if (!email || !password) { showLoginError('Please enter your email and password.'); return; }
+  btn.textContent = 'Signing in…';
+  btn.disabled = true;
+  errEl.style.display = 'none';
+  try {
+    const res = await fetch(_getSbUrl().replace(/\/$/, '') + '/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      headers: { 'apikey': _getSbKey(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error_description || data.msg || 'Login failed');
+    _saveSession(data.access_token, data.refresh_token);
+    document.getElementById('login-overlay').style.display = 'none';
+    await _fetchUserProfile();
+    initFromSupabase();
+  } catch(e) {
+    showLoginError(e.message || 'Login failed. Check your credentials.');
+    btn.textContent = 'Sign In';
+    btn.disabled = false;
+  }
+}
+
+function showLoginError(msg) {
+  const el = document.getElementById('login-error');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+
+async function signOut() {
+  // Call Supabase signout endpoint (best-effort)
+  try {
+    await fetch(_getSbUrl().replace(/\/$/, '') + '/auth/v1/logout', {
+      method: 'POST',
+      headers: { 'apikey': _getSbKey(), 'Authorization': 'Bearer ' + _sbSessionToken }
+    });
+  } catch(e) {}
+  _clearSession();
+  // Clear in-memory data
+  orders = []; appraisers = []; amcs = []; lenders = [];
+  showLoginScreen();
+}
+
+function showLoginScreen() {
+  const overlay = document.getElementById('login-overlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    // reset form
+    const e = document.getElementById('login-email');
+    const p = document.getElementById('login-password');
+    const err = document.getElementById('login-error');
+    if (e) e.value = '';
+    if (p) p.value = '';
+    if (err) err.style.display = 'none';
+    const btn = document.getElementById('login-btn');
+    if (btn) { btn.textContent = 'Sign In'; btn.disabled = false; }
+  }
+}
+
 function _sbHeaders() {
   const key = _getSbKey();
+  const bearer = _sbSessionToken || key;
   return {
     'apikey': key,
-    'Authorization': 'Bearer ' + key,
+    'Authorization': 'Bearer ' + bearer,
     'Content-Type': 'application/json',
     'Prefer': 'return=representation'
   };
@@ -2903,6 +3026,23 @@ async function initFromSupabase() {
     setCoTab('amc');
     return;
   }
+
+  // ── Auth gate ──────────────────────────────────────────────────────────────
+  // If we have a saved session token try to fetch the user profile to validate it.
+  // If that fails (expired token), show login screen.
+  if (!_sbSessionToken) {
+    showLoginScreen();
+    return;
+  }
+  // Validate session by fetching user profile
+  try {
+    await _fetchUserProfile();
+  } catch(e) {
+    _clearSession();
+    showLoginScreen();
+    return;
+  }
+  // ──────────────────────────────────────────────────────────────────────────
 
   const loadingDiv = document.createElement('div');
   loadingDiv.id = 'sb-loading';
@@ -3285,6 +3425,8 @@ function renderMapPage() {
 function filteredOrders() {
   const q = searchQuery.toLowerCase();
   return orders.filter(o => {
+    // Appraiser role: only see their own orders
+    if (!isAdmin && currentAppraiserId && o.appraiserId !== currentAppraiserId) return false;
     if (filters.status === '__open__') { if (['complete','cancelled'].includes(o.status)) return false; }
     else if (filters.status !== 'all' && o.status !== filters.status) return false;
     if (filters.type !== 'all' && o.type !== filters.type) return false;
@@ -6685,7 +6827,8 @@ function renderAppraisalPayments() {
     apList.map(a => `<option value="${a.id}"${currentVal===a.id?' selected':''}>${esc(a.name)}</option>`).join('');
 
   // Only completed orders with a fee and an appraiser assigned
-  const apOrders = orders.filter(o => o.fee > 0 && o.appraiserId && o.status === 'complete');
+  const apOrders = orders.filter(o => o.fee > 0 && o.appraiserId && o.status === 'complete' &&
+    (isAdmin || !currentAppraiserId || o.appraiserId === currentAppraiserId));
   const filtered = apOrders.filter(o => {
     if (sel.value !== 'all' && o.appraiserId !== sel.value) return false;
     if (apPayFilter === 'unpaid') return !o.appraiserPaid;
@@ -6793,6 +6936,35 @@ function _buildPrintWindow(title, subtitle, tableHtml, summaryHtml) {
     <button class="btn-p secondary" onclick="window.close()">Close</button>
   </div>
   
+<!-- ══ LOGIN OVERLAY ══ -->
+<div id="login-overlay" style="display:none;position:fixed;inset:0;background:var(--paper);z-index:99999;align-items:center;justify-content:center">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.12)">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--accent);line-height:1">Appraisal<span style="color:var(--ink)">Desk</span></div>
+      <div style="font-size:13px;color:var(--muted);margin-top:6px">Sign in to continue</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--steel);display:block;margin-bottom:5px">Email</label>
+        <input id="login-email" type="email" placeholder="you@example.com" autocomplete="email"
+          style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink)"
+          onkeydown="if(event.key==='Enter')document.getElementById('login-password').focus()">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--steel);display:block;margin-bottom:5px">Password</label>
+        <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password"
+          style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink)"
+          onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div id="login-error" style="display:none;font-size:12px;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px"></div>
+      <button onclick="doLogin()" id="login-btn"
+        style="padding:11px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px">
+        Sign In
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ SUPABASE SETUP MODAL ══ -->
 <div id="sb-setup-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99999;align-items:center;justify-content:center;padding:20px">
   <div style="background:#fff;border-radius:16px;width:100%;max-width:500px;box-shadow:0 24px 80px rgba(0,0,0,.4);overflow:hidden">
@@ -6843,7 +7015,8 @@ function printAppraisalPayments() {
   const filterLabel = apPayFilter === 'unpaid' ? 'Unpaid' : apPayFilter === 'paid' ? 'Paid' : 'All';
   const dateStr = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 
-  const apOrders = orders.filter(o => o.fee > 0 && o.appraiserId && o.status === 'complete');
+  const apOrders = orders.filter(o => o.fee > 0 && o.appraiserId && o.status === 'complete' &&
+    (isAdmin || !currentAppraiserId || o.appraiserId === currentAppraiserId));
   const rows = apOrders.filter(o => {
     if (sel && sel.value !== 'all' && o.appraiserId !== sel.value) return false;
     if (apPayFilter === 'unpaid') return !o.appraiserPaid;
@@ -6896,7 +7069,8 @@ function emailAppraisalPayments() {
   const apLabel = sel ? sel.options[sel.selectedIndex]?.text : 'All Appraisers';
   const filterLabel = apPayFilter === 'unpaid' ? 'Unpaid' : apPayFilter === 'paid' ? 'Paid' : 'All';
 
-  const apOrders = orders.filter(o => o.fee > 0 && o.appraiserId && o.status === 'complete');
+  const apOrders = orders.filter(o => o.fee > 0 && o.appraiserId && o.status === 'complete' &&
+    (isAdmin || !currentAppraiserId || o.appraiserId === currentAppraiserId));
   const allForAp = apOrders.filter(o => sel.value === 'all' || o.appraiserId === sel.value);
   const totalEarn  = allForAp.reduce((s,o) => s + Math.round(o.fee * ((o.feeSplit!=null?o.feeSplit:100)/100)), 0);
   const paidEarn   = allForAp.filter(o=>o.appraiserPaid).reduce((s,o) => s + Math.round(o.fee * ((o.feeSplit!=null?o.feeSplit:100)/100)), 0);
@@ -8301,8 +8475,8 @@ window.addEventListener('unhandledrejection', function(e) {
   } catch(e) { applyTheme('system'); }
   try { setupAutoBackup(); } catch(e) {}
 
-  // _sbHasConfig() is always true (credentials are hardcoded as SB_DEFAULT_URL/KEY)
-  // so always go straight to Supabase load — no localStorage check needed
+  // Restore saved session token (if any) then proceed to auth gate in initFromSupabase
+  _loadSavedSession();
   initFromSupabase();
 })();
 </script>
