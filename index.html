@@ -2768,8 +2768,15 @@ function _clearSession() {
 function _loadSavedSession() {
   try {
     const s = JSON.parse(localStorage.getItem(SB_SESSION_KEY) || 'null');
-    if (s && s.access) { _sbSessionToken = s.access; _sbRefreshToken = s.refresh; return true; }
+    // Reject if it looks like the anon key (not a real user JWT — user JWTs have role:authenticated)
+    if (s && s.access && s.access !== SB_DEFAULT_KEY) {
+      _sbSessionToken = s.access;
+      _sbRefreshToken = s.refresh;
+      return true;
+    }
   } catch(e) {}
+  // Clear any stale/invalid session
+  try { localStorage.removeItem(SB_SESSION_KEY); } catch(e) {}
   return false;
 }
 
@@ -8474,6 +8481,15 @@ window.addEventListener('unhandledrejection', function(e) {
     applyTheme(s.theme || 'system');
   } catch(e) { applyTheme('system'); }
   try { setupAutoBackup(); } catch(e) {}
+
+  // One-time migration: if auth system is new (v2), clear any pre-auth localStorage session
+  try {
+    const authVer = localStorage.getItem('ad_auth_ver');
+    if (authVer !== '2') {
+      localStorage.removeItem(SB_SESSION_KEY);
+      localStorage.setItem('ad_auth_ver', '2');
+    }
+  } catch(e) {}
 
   // Restore saved session token (if any) then proceed to auth gate in initFromSupabase
   _loadSavedSession();
