@@ -3561,16 +3561,21 @@ function renderOrders() {
 }
 
 function buildSidebarFilters() {
+  // Scope to the logged-in appraiser's orders when not admin
+  const myOrders = (!isAdmin && currentAppraiserId)
+    ? orders.filter(o => o.appraiserId === currentAppraiserId)
+    : orders;
+
   // Status
   const allStatuses = ['all','__open__','new','inspection','inspected','review','contract','questionnaire','onhold','complete','cancelled'];
   const statusEl = document.getElementById('status-filters');
   const counts = {};
-  orders.forEach(o => { counts[o.status] = (counts[o.status]||0) + 1; });
-  const openCount = orders.filter(o => !['complete','cancelled'].includes(o.status)).length;
+  myOrders.forEach(o => { counts[o.status] = (counts[o.status]||0) + 1; });
+  const openCount = myOrders.filter(o => !['complete','cancelled'].includes(o.status)).length;
   statusEl.innerHTML = allStatuses.map(s => {
     let label, count, color;
     if (s === 'all') {
-      label = 'All Statuses'; count = orders.length; color = 'var(--muted)';
+      label = 'All Statuses'; count = myOrders.length; color = 'var(--muted)';
     } else if (s === '__open__') {
       label = 'Open Orders'; count = openCount; color = 'var(--accent)';
     } else {
@@ -3590,7 +3595,7 @@ function buildSidebarFilters() {
     appraisers.map(a => `<option value="${a.id}"${filters.appraiser===a.id?' selected':''}>${esc(a.name)}</option>`).join('');
 
   // AMC filter buttons
-  const amcNames = [...new Set(orders.map(o => o.amc).filter(Boolean))];
+  const amcNames = [...new Set(myOrders.map(o => o.amc).filter(Boolean))];
   const amcEl = document.getElementById('amc-filters');
   amcEl.innerHTML = `<button class="filter-btn${filters.amc==='all'?' active':''}" onclick="setAmcFilter('all')">
     <span class="filter-label">All AMCs</span></button>` +
@@ -3598,14 +3603,14 @@ function buildSidebarFilters() {
       const active = filters.amc.toLowerCase() === n.toLowerCase() ? ' active' : '';
       return `<button class="filter-btn${active}" onclick="setAmcFilter('${esc(n)}')">
         <span class="filter-label">${esc(n)}</span>
-        <span class="filter-count">${orders.filter(o=>(o.amc||'').toLowerCase()===n.toLowerCase()).length}</span>
+        <span class="filter-count">${myOrders.filter(o=>(o.amc||'').toLowerCase()===n.toLowerCase()).length}</span>
       </button>`;
     }).join('') +
     `<button class="filter-btn${filters.amc==='__none__'?' active':''}" onclick="setAmcFilter('__none__')">
       <span class="filter-label" style="font-style:italic;color:var(--muted)">No AMC</span></button>`;
 
   // Lender filter buttons
-  const lenderNames = [...new Set(orders.map(o => o.lender).filter(Boolean))];
+  const lenderNames = [...new Set(myOrders.map(o => o.lender).filter(Boolean))];
   const lenderEl = document.getElementById('lender-filters');
   lenderEl.innerHTML = `<button class="filter-btn${filters.lender==='all'?' active':''}" onclick="setLenderFilter('all')">
     <span class="filter-label">All Lenders</span></button>` +
@@ -3613,7 +3618,7 @@ function buildSidebarFilters() {
       const active = filters.lender.toLowerCase() === n.toLowerCase() ? ' active' : '';
       return `<button class="filter-btn${active}" onclick="setLenderFilter('${esc(n)}')">
         <span class="filter-label">${esc(n)}</span>
-        <span class="filter-count">${orders.filter(o=>(o.lender||'').toLowerCase()===n.toLowerCase()).length}</span>
+        <span class="filter-count">${myOrders.filter(o=>(o.lender||'').toLowerCase()===n.toLowerCase()).length}</span>
       </button>`;
     }).join('') +
     `<button class="filter-btn${filters.lender==='__none__'?' active':''}" onclick="setLenderFilter('__none__')">
