@@ -6723,7 +6723,11 @@ function renderAccounting() {
 
   // ── Compute totals ─────────────────────────────────────────────────────
   let totalBilled = 0, totalCollected = 0, openCount = 0;
-  const invoices = orders.filter(o => o.fee > 0).map(o => {
+  const invoices = orders.filter(o => {
+    if (o.fee <= 0) return false;
+    if (!isAdmin && currentAppraiserId && o.appraiserId !== currentAppraiserId) return false;
+    return true;
+  }).map(o => {
     const fee      = parseFloat(o.fee) || 0;
     const pmts     = o.payments || [];
     const paid     = pmts.reduce((s, p) => s + (parseFloat(p.amount)||0), 0);
