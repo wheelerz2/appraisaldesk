@@ -2419,13 +2419,15 @@ input, select, textarea { font-family: inherit; font-size: inherit; color: inher
       <div class="form-row triple">
         <div class="field">
           <label>Inspection Date</label>
-          <input type="date" id="f-inspection">
+          <input type="date" id="f-inspection" oninput="updateIcalBtn()">
         </div>
         <div class="field">
           <label>Inspection Time</label>
-          <input type="time" id="f-inspection-time" placeholder="09:00">
+          <input type="time" id="f-inspection-time" placeholder="09:00" oninput="updateIcalBtn()">
         </div>
-        <div class="field"></div>
+        <div class="field" style="display:flex;align-items:flex-end">
+          <a id="f-ical-btn" download="inspection.ics" style="display:none;padding:7px 14px;background:var(--accent);color:#fff;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap">📅 Add to Calendar</a>
+        </div>
       </div>
       <div class="form-row">
         <div class="field">
@@ -3731,6 +3733,7 @@ function openOrderModal(id) {
     document.getElementById('f-notes').value      = o.notes      || '';
     document.getElementById('f-feesplit').value   = o.feeSplit != null ? o.feeSplit : 100;
     updateFeeSplitHint();
+    updateIcalBtn();
   } else {
     setBorrowerFields([]);
     toggleContractSection();
@@ -3742,6 +3745,8 @@ function openOrderModal(id) {
     document.getElementById('f-appraiser').value = '';
     document.getElementById('f-feesplit').value = 100;
     updateFeeSplitHint();
+    const icalBtn = document.getElementById('f-ical-btn');
+    if (icalBtn) icalBtn.style.display = 'none';
   }
 
   // Reset upload zone for each new modal open
@@ -6227,6 +6232,62 @@ function verifyAddress() {
 // ══════════════════════════════════════════
 // FEE SPLIT HINT
 // ══════════════════════════════════════════
+function updateIcalBtn() {
+  const btn  = document.getElementById('f-ical-btn');
+  if (!btn) return;
+  const date = document.getElementById('f-inspection')?.value;
+  const time = document.getElementById('f-inspection-time')?.value;
+  if (!date) { btn.style.display = 'none'; return; }
+
+  // Build iCal datetime strings (local, no timezone conversion)
+  const [y,m,d] = date.split('-');
+  let dtStart, dtEnd;
+  if (time) {
+    const [hh, mm] = time.split(':');
+    const pad = n => String(n).padStart(2,'0');
+    // End = start + 1 hour
+    const endH = parseInt(hh) + 1;
+    dtStart = `${y}${m}${d}T${pad(hh)}${pad(mm)}00`;
+    dtEnd   = `${y}${m}${d}T${pad(endH)}${pad(mm)}00`;
+  } else {
+    // All-day
+    dtStart = `${y}${m}${d}`;
+    dtEnd   = `${y}${m}${d}`;
+  }
+
+  const addr   = document.getElementById('f-address')?.value?.trim() || '';
+  const client = document.getElementById('f-client')?.value?.trim() || '';
+  const type   = document.getElementById('f-type')?.value?.trim() || '';
+  const summary = `Inspection${type ? ' – ' + type : ''}${client ? ' – ' + client : ''}`;
+  const uid    = `inspect-${Date.now()}@rhappraisal.com`;
+  const stamp  = new Date().toISOString().replace(/[-:]/g,'').slice(0,15) + 'Z';
+
+  const allDay = !time;
+  const dtProp = allDay
+    ? `DTSTART;VALUE=DATE:${dtStart}\r\nDTEND;VALUE=DATE:${dtEnd}`
+    : `DTSTART:${dtStart}\r\nDTEND:${dtEnd}`;
+
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//RH Appraisal//AppraisalDesk//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTAMP:${stamp}`,
+    dtProp,
+    `SUMMARY:${summary}`,
+    addr ? `LOCATION:${addr}` : '',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].filter(Boolean).join('\r\n');
+
+  btn.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+  btn.download = `inspection-${date}.ics`;
+  btn.style.display = 'inline-block';
+}
+
 function updateFeeSplitHint() {
   const fee = parseFloat(document.getElementById('f-fee')?.value) || 0;
   const split = parseInt(document.getElementById('f-feesplit')?.value) || 100;
