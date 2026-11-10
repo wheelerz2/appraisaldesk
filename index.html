@@ -2820,7 +2820,8 @@ async function doLogin() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error_description || data.msg || 'Login failed');
     _saveSession(data.access_token, data.refresh_token);
-    document.getElementById('login-overlay').style.display = 'none';
+    const _lo = document.getElementById('login-overlay');
+    if (_lo) _lo.style.display = 'none';
     await _fetchUserProfile();
     initFromSupabase();
   } catch(e) {
@@ -2849,11 +2850,45 @@ async function signOut() {
   showLoginScreen();
 }
 
+function _ensureLoginOverlay() {
+  if (document.getElementById('login-overlay')) return;
+  const div = document.createElement('div');
+  div.id = 'login-overlay';
+  div.style.cssText = 'display:none;position:fixed;inset:0;background:var(--paper);z-index:99999;align-items:center;justify-content:center';
+  div.innerHTML = `
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.12)">
+      <div style="text-align:center;margin-bottom:28px">
+        <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--accent);line-height:1">Appraisal<span style="color:var(--ink)">Desk</span></div>
+        <div style="font-size:13px;color:var(--muted);margin-top:6px">Sign in to continue</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--steel);display:block;margin-bottom:5px">Email</label>
+          <input id="login-email" type="email" placeholder="you@example.com" autocomplete="email"
+            style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink)"
+            onkeydown="if(event.key==='Enter')document.getElementById('login-password').focus()">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--steel);display:block;margin-bottom:5px">Password</label>
+          <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password"
+            style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink)"
+            onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <div id="login-error" style="display:none;font-size:12px;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px"></div>
+        <button onclick="doLogin()" id="login-btn"
+          style="padding:11px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px">
+          Sign In
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(div);
+}
+
 function showLoginScreen() {
+  _ensureLoginOverlay();
   const overlay = document.getElementById('login-overlay');
   if (overlay) {
     overlay.style.display = 'flex';
-    // reset form
     const e = document.getElementById('login-email');
     const p = document.getElementById('login-password');
     const err = document.getElementById('login-error');
