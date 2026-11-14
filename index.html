@@ -1723,6 +1723,7 @@ body.is-admin .admin-only { display: block !important; }
         <h4>Lender</h4>
         <div class="filter-group" id="lender-filters"></div>
       </div>
+      <div style="margin-top:auto;padding-top:12px;font-size:10px;color:var(--muted);letter-spacing:.04em;opacity:.6;user-select:none">AppraisalDesk v2.0</div>
     </aside>
     <div class="main-content" id="orders-content">
       <div id="orders-toolbar">
@@ -1765,6 +1766,12 @@ body.is-admin .admin-only { display: block !important; }
         <div id="cal-month-label"></div>
         <button class="cal-nav-btn" onclick="calShift(1)">&#8250;</button>
         <button class="sort-btn" onclick="calToday()" style="margin-left:auto">Today</button>
+        <label class="cal-due-toggle" title="Show or hide due dates on calendar" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--muted);margin-left:12px;user-select:none">
+          <div class="toggle-track" id="cal-due-track" onclick="toggleCalDue()" style="width:32px;height:18px;border-radius:9px;background:var(--accent);position:relative;cursor:pointer;transition:background .2s">
+            <div class="toggle-thumb" id="cal-due-thumb" style="width:14px;height:14px;border-radius:50%;background:#fff;position:absolute;top:2px;left:16px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>
+          </div>
+          Due Dates
+        </label>
       </div>
       <div id="cal-legend"></div>
       <div id="cal-grid-wrap">
@@ -2341,6 +2348,13 @@ body.is-admin .admin-only { display: block !important; }
           <label>AMC Order ID</label>
           <input type="text" id="f-amcid" placeholder="e.g. AMC-98765" style="font-family:'DM Mono',monospace">
         </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>FHA Case Number</label>
+          <input type="text" id="f-fha-case" placeholder="e.g. 123-4567890" style="font-family:'DM Mono',monospace">
+        </div>
+        <div class="field"></div>
       </div>
       <div class="form-row triple">
         <div class="field">
@@ -3228,6 +3242,7 @@ function seedData() {
 // ══════════════════════════════════════════
 let filters = { status: 'all', appraiser: 'all', type: 'all', amc: 'all', lender: 'all' };
 let calFilters = { appraiser: 'all', amc: 'all', lender: 'all' };
+let calShowDue = true;
 let sortMode = 'date';
 let searchQuery = '';
 let currentPage = 'orders';
@@ -3713,6 +3728,7 @@ function openDetail(id) {
         <div class="detail-field"><label>AMC</label><span>${esc(o.amc)||'—'}</span></div>
         ${o.loanNum ? `<div class="detail-field"><label>Loan #</label><span style="font-family:'DM Mono',monospace;font-size:13px">${esc(o.loanNum)}</span></div>` : ''}
         ${o.amcOrderId ? `<div class="detail-field"><label>AMC Order ID</label><span style="font-family:'DM Mono',monospace;font-size:13px">${esc(o.amcOrderId)}</span></div>` : ''}
+        ${o.fhaCaseNum ? `<div class="detail-field"><label>FHA Case #</label><span style="font-family:'DM Mono',monospace;font-size:13px">${esc(o.fhaCaseNum)}</span></div>` : ''}
         ${o.contractPrice ? `<div class="detail-field"><label>Contract Price</label><span>$${Number(o.contractPrice).toLocaleString()}</span></div>` : ''}
         ${o.contractDate ? `<div class="detail-field"><label>Contract Date</label><span>${new Date(o.contractDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span></div>` : ''}
       </div>
@@ -3912,6 +3928,7 @@ function openOrderModal(id) {
     document.getElementById('f-amc').value         = o.amc         || '';
     document.getElementById('f-loannum').value    = o.loanNum    || '';
     document.getElementById('f-amcid').value      = o.amcOrderId || '';
+    document.getElementById('f-fha-case').value   = o.fhaCaseNum || '';
     document.getElementById('f-proptype').value   = o.propType   || '';
     document.getElementById('f-type').value       = o.type       || '';
     document.getElementById('f-purpose').value    = o.purpose    || '';
@@ -3935,7 +3952,7 @@ function openOrderModal(id) {
   } else {
     setBorrowerFields([]);
     toggleContractSection();
-    ['f-street','f-unit','f-city','f-state','f-zip','f-phone','f-email','f-contact-name','f-contact-phone','f-lender','f-lender-addr','f-lender-phone','f-amc','f-loannum','f-amcid','f-contract-price','f-contract-date',
+    ['f-street','f-unit','f-city','f-state','f-zip','f-phone','f-email','f-contact-name','f-contact-phone','f-lender','f-lender-addr','f-lender-phone','f-amc','f-loannum','f-amcid','f-fha-case','f-contract-price','f-contract-date',
      'f-proptype','f-type','f-purpose','f-fee','f-order-date','f-order-sent','f-due','f-inspection','f-inspection-time','f-insp-contact','f-insp-contact-phone','f-notes'].forEach(id => {
       document.getElementById(id).value = '';
     });
@@ -4038,6 +4055,7 @@ function saveOrder() {
     amc:         document.getElementById('f-amc').value.trim(),
     loanNum:     document.getElementById('f-loannum').value.trim(),
     amcOrderId:  document.getElementById('f-amcid').value.trim(),
+    fhaCaseNum:  document.getElementById('f-fha-case').value.trim(),
     contractPrice: document.getElementById('f-purpose').value === 'Purchase' ? (parseFloat(document.getElementById('f-contract-price').value) || '') : '',
     contractDate:  document.getElementById('f-purpose').value === 'Purchase' ? (document.getElementById('f-contract-date').value || '') : '',
     propType:    document.getElementById('f-proptype').value,
@@ -4116,6 +4134,19 @@ function acBlur(type) {
 function acSelect(type, name) {
   document.getElementById('f-' + type).value = name;
   document.getElementById('ac-' + type).classList.remove('open');
+  // Auto-fill lender address and phone from stored lender record
+  if (type === 'lender') {
+    const rec = lenders.find(c => c.name === name);
+    if (rec) {
+      const addrEl  = document.getElementById('f-lender-addr');
+      const phoneEl = document.getElementById('f-lender-phone');
+      // Build full address from stored fields
+      const parts = [rec.address, rec.city, rec.state ? (rec.zip ? rec.state + ' ' + rec.zip : rec.state) : rec.zip].filter(Boolean);
+      const fullAddr = parts.join(', ');
+      if (addrEl && fullAddr) addrEl.value = fullAddr;
+      if (phoneEl && rec.phone && !phoneEl.value) phoneEl.value = rec.phone;
+    }
+  }
 }
 
 function acAddNew(type, name) {
@@ -4307,6 +4338,14 @@ function buildCalSidebar() {
 function setCalAppraiser(v) { calFilters.appraiser = v; buildCalSidebar(); renderCalendar(); }
 function setCalAmc(v)       { calFilters.amc = v;       buildCalSidebar(); renderCalendar(); }
 function setCalLender(v)    { calFilters.lender = v;    buildCalSidebar(); renderCalendar(); }
+function toggleCalDue() {
+  calShowDue = !calShowDue;
+  const track = document.getElementById('cal-due-track');
+  const thumb = document.getElementById('cal-due-thumb');
+  if (track) track.style.background = calShowDue ? 'var(--accent)' : '#888';
+  if (thumb) thumb.style.left = calShowDue ? '16px' : '2px';
+  renderCalendar();
+}
 
 function calShift(d) { calMonth += d; if (calMonth > 11) { calMonth=0; calYear++; } if (calMonth < 0) { calMonth=11; calYear--; } renderCalendar(); }
 function calToday()  { const t=new Date(); calYear=t.getFullYear(); calMonth=t.getMonth(); renderCalendar(); }
@@ -4324,7 +4363,7 @@ function renderCalendar() {
   // Build event map from filtered orders
   const evMap = {};
   visible.forEach(o => {
-    if (o.due) {
+    if (calShowDue && o.due) {
       const k = o.due.slice(0,10);
       if (!evMap[k]) evMap[k] = [];
       evMap[k].push({ type:'due', order:o });
@@ -4381,20 +4420,22 @@ function renderCalendar() {
     const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const isToday = dateStr === todayStr;
     const evs = evMap[dateStr] || [];
-    const max = 3;
-    const shown = evs.slice(0, max);
-    const more  = evs.length - max;
+    // Filter due events by toggle
+    const visibleEvs = calShowDue ? evs : evs.filter(e => e.type !== 'due');
+    const max = 8;
+    const shown = visibleEvs.slice(0, max);
+    const more  = visibleEvs.length - max;
 
     let evHtml = shown.map(e => {
       const addr = e.order.address.split(',')[0];
       const color = apColor(e.order.appraiserId);
       const initials = apInitials(e.order.appraiserId);
-      // Due: solid background; Inspection: slightly transparent with dashed border
+      // Due: solid background with DUE label; Inspection: slightly transparent with dashed border
       const style = e.type === 'due'
         ? `background:${color}`
         : `background:${color}99;outline:1px dashed ${color}`;
-      const prefix = e.type === 'due' ? '📅 ' : '🔍 ';
-      return `<div class="cal-ev" style="${style}" title="${esc(e.order.address)}">${prefix}${esc(initials)} ${esc(addr)}</div>`;
+      const prefix = e.type === 'due' ? 'DUE: ' : 'INSP: ';
+      return `<div class="cal-ev" style="${style}" title="${e.type==='due'?'Due Date: ':'Inspection: '}${esc(e.order.address)}">${prefix}${esc(addr)}</div>`;
     }).join('');
     if (more > 0) evHtml += `<div class="cal-more">+${more} more</div>`;
 
@@ -5884,12 +5925,13 @@ function extractOrderData(raw) {
       if (laAddrLines.length) trySet('f-lender-addr', laAddrLines.join(', '));
     }
 
-    // Loan Type + FHA Case — append to notes
+    // Loan Type + FHA Case
     const vlLoanTypeRaw = vlVal('Loan\\s+Type');
     const vlFhaCaseRaw  = vlVal('FHA\\s+Case\\s+Number');
+    // FHA Case → dedicated field
+    if (vlFhaCaseRaw && !/^N/i.test(vlFhaCaseRaw)) trySet('f-fha-case', vlFhaCaseRaw.trim());
     const notesParts = [];
     if (vlLoanTypeRaw && !/^N/i.test(vlLoanTypeRaw)) notesParts.push('Loan Type: ' + vlLoanTypeRaw);
-    if (vlFhaCaseRaw  && !/^N/i.test(vlFhaCaseRaw))  notesParts.push('FHA Case #: ' + vlFhaCaseRaw);
 
     // Notes: Access Instructions
     const vlAccessRaw = vlVal('Access\\s+Instructions?');
@@ -6126,6 +6168,106 @@ function extractOrderData(raw) {
     // AMC Order ID — "File #: AL-363050"
     const alFileM = text.match(/File\s*#\s*[:\-]?\s*([\w\-]{3,20})/i);
     if (alFileM && !/N\/A/i.test(alFileM[1])) trySet('f-amcid', alFileM[1].trim());
+
+    return filled;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  // A.L.S. APPRAISAL MANAGEMENT SERVICE ORDER FORM
+  // Detected by: "Appraisal Services Order Form" title or ALS AMC header or
+  // the LENDER: block + Nationwide pattern in partially-decoded PDFs.
+  // This form is generated by wkhtmltopdf with CID font encoding — PDF.js only
+  // reliably decodes the LENDER block (standard WinAnsi font).
+  // Full extraction works when the user copies text from the OCR-renderd PDF.
+  // ════════════════════════════════════════════════════════════════════════
+  const isALS = /Appraisal\s+Services\s+Order\s+Form|A\.?L\.?S\.?\s+APPRAISAL\s+MANAGEMENT|asarlo@optonline/i.test(text);
+  if (isALS) {
+    // AMC is always A.L.S. Appraisal Management Service, Inc
+    trySet('f-amc', 'A.L.S. Appraisal Management Service, Inc');
+
+    // Lender — always under the LENDER: block at the top-left of the PDF
+    // PDF.js decodes this section correctly (uses WinAnsi font)
+    const alsLenderM = text.match(/LENDER\s*:?\s*\n?\s*([A-Za-z][\w\s\.,&'-]{3,60})/i);
+    if (alsLenderM) trySet('f-lender', alsLenderM[1].trim());
+
+    // Lender address — lines after lender name, before next section
+    // Pattern: street line followed by city/state/zip
+    const alsLenderPos = text.search(/LENDER\s*:/i);
+    if (alsLenderPos >= 0) {
+      const lenderBlock = text.slice(alsLenderPos, alsLenderPos + 300);
+      const lenderLines = lenderBlock.split('\n').map(l => l.trim()).filter(Boolean);
+      // Skip first line (LENDER:), optionally skip second (name), collect address lines
+      const addrLines = [];
+      let pastName = false;
+      for (let li = 1; li < lenderLines.length; li++) {
+        const l = lenderLines[li];
+        if (/^LENDER\s*:/i.test(l)) continue;
+        // Line looks like a company name (letters, no digits starting): skip as the name
+        if (!pastName && /^[A-Za-z]/.test(l) && !/^\d/.test(l) && !/Appraisal|Order|Form|Services/i.test(l)) {
+          pastName = true; // this is the name line
+          continue;
+        }
+        // Address line: starts with digit or has suite/blvd etc
+        if (/^\d|Blvd|Ave|Suite|St\b|Rd\b|Dr\b|Place|Pkwy/i.test(l)) {
+          addrLines.push(l);
+        } else if (addrLines.length && /\d{5}/.test(l)) {
+          addrLines.push(l); // city/state/zip
+          break;
+        } else if (addrLines.length) {
+          break;
+        }
+        if (addrLines.length >= 2) break;
+      }
+      if (addrLines.length) trySet('f-lender-addr', addrLines.join(', '));
+    }
+
+    // Property Address — "Address: 3230 87TH ST, EAST ELMHURST NY 11369 (Queens County)"
+    const alsAddrM = text.match(/Address\s*:\s*([^\n\r(]{10,80})/i);
+    if (alsAddrM) {
+      const cleanAddr = alsAddrM[1].trim().replace(/\s*\([^)]*\)\s*$/, '').trim();
+      setAddressFields(cleanAddr);
+    }
+
+    // Loan Number — "Loan Number: 2611IHLC6386"
+    const alsLoanM = text.match(/Loan\s+Number\s*:\s*([\w\-]{4,30})/i);
+    if (alsLoanM && !/N\/A/i.test(alsLoanM[1])) trySet('f-loannum', alsLoanM[1].trim());
+
+    // Form type — "Requested Forms: 1025" or "Product Names: Multi-Family Appraisal (1025)"
+    const alsFormsM = text.match(/Requested\s+Forms?\s*:\s*([\w\., ]{1,40})/i)
+                   || text.match(/Product\s+Names?\s*:\s*([\w\-\s()]{3,60})/i);
+    if (alsFormsM) {
+      const fType = detectFormType(alsFormsM[1]);
+      if (fType) trySet('f-type', fType);
+    }
+
+    // Loan Purpose — "Loan Purpose: Mortgage Financing, Refinance"
+    const alsPurposeM = text.match(/Loan\s+Purpose\s*:\s*([^\n\r]{3,60})/i);
+    if (alsPurposeM) trySet('f-purpose', normalizePurpose(alsPurposeM[1]));
+
+    // FHA Case Number — "Case Number: 123-456"
+    const alsCaseM = text.match(/Case\s+Number\s*:\s*([\w\-]{4,30})/i);
+    if (alsCaseM && !/^\s*$/.test(alsCaseM[1])) trySet('f-fha-case', alsCaseM[1].trim());
+
+    // Order Date — "Requested On: 11/12/2026"
+    const alsDateM = text.match(/Requested\s+On\s*:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
+    if (alsDateM) trySet('f-order-date', normalizeDate(alsDateM[1]));
+
+    // Primary Contact name and phone
+    // "Armando Gaitan (Primary Contact)" then "917.667.9643" or "C:917-667-9643"
+    const alsPrimaryM = text.match(/([A-Z][a-z]+\s+[A-Z][a-z]+)\s*\(Primary\s+Contact\)/i);
+    if (alsPrimaryM) setBorrowerFields([alsPrimaryM[1].trim()]);
+    const alsPhoneM = text.match(/(?:Primary\s+Contact[^)\n]*\)\s*\n?\s*|C\s*:?\s*)(\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4})/i)
+                   || text.match(/(\d{3}[\.\-]\d{3}[\.\-]\d{4})/);
+    if (alsPhoneM) trySet('f-phone', alsPhoneM[1].trim());
+
+    // Email — skip AMC internal addresses
+    const alsEmails = [...text.matchAll(/\b([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\b/g)];
+    for (const em of alsEmails) {
+      const addr = em[1].toLowerCase();
+      if (!addr.includes('optonline') && !addr.includes('rhappraisal') && addr !== 'na@na.com') {
+        trySet('f-email', em[1]); break;
+      }
+    }
 
     return filled;
   }
