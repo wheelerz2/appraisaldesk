@@ -5839,9 +5839,11 @@ function extractOrderData(raw) {
     const vlDueRaw = vlVal('Due\\s+Date');
     if (vlDueRaw) trySet('f-due', normalizeDateWords(vlDueRaw));
 
-    // Form type from PRODUCT FEE section
-    const vlProdM = text.match(/\b(1004|1073|1025|2055|2090|1004C|1004D)\b/);
-    if (vlProdM) { const fType = detectFormType(vlProdM[1]); if (fType) trySet('f-type', fType); }
+    // Form type — search PRODUCT FEE section first, fall back to full text
+    const vlFeeBlock = text.match(/PRODUCT\s*FEE([\s\S]{0,500})/i);
+    const vlFeeBlockText = vlFeeBlock ? vlFeeBlock[1] : '';
+    const vlFormType = detectFormType(vlFeeBlockText) || detectFormType(text);
+    if (vlFormType) trySet('f-type', vlFormType);
 
     // Purpose
     const vlPurpRaw = vlVal('Transaction\\s+Type');
@@ -5851,9 +5853,52 @@ function extractOrderData(raw) {
     const vlPropRaw = vlVal('Property\\s+Type');
     if (vlPropRaw && !/^N/.test(vlPropRaw)) trySet('f-proptype', vlPropRaw);
 
+    // Order Date
+    const vlOrderDateRaw = vlVal('Order\\s+Date');
+    if (vlOrderDateRaw) trySet('f-order-date', normalizeDateWords(vlOrderDateRaw));
+
+    // Inspection Scheduled date + time
+    // "Inspection Scheduled: 19 Nov 2026 9:00 AM - 10:00 AM"
+    const vlInspM = text.match(/Inspection\s+Scheduled:\s*([\d]{1,2}\s+\w{3}\s+\d{4})\s*([\d:]+\s*[AP]M)?/i);
+    if (vlInspM) {
+      const inspDate = normalizeDateWords(vlInspM[1]);
+      if (inspDate) trySet('f-inspection', inspDate);
+      if (vlInspM[2]) trySet('f-inspection-time', vlInspM[2].trim());
+    }
+
+    // Lender Address — may span 2 lines (street + city/state/zip)
+    const vlLenderAddrPos = text.search(/Lender\s+Address\s*:?/i);
+    if (vlLenderAddrPos >= 0) {
+      const laSuffix = text.slice(vlLenderAddrPos);
+      const laColonPos = laSuffix.indexOf(':');
+      const laAfter = laColonPos >= 0 ? laSuffix.slice(laColonPos + 1).replace(/^\s+/, '') : '';
+      const laLines = laAfter.split('\n').map(l => l.trim()).filter(Boolean);
+      // Take up to 2 lines that look like an address (not another label)
+      const laAddrLines = [];
+      for (const l of laLines) {
+        if (/:/.test(l) && !/\d{5}/.test(l)) break; // hit next label
+        if (/^N\s*\/\s*A$/i.test(l)) break;
+        laAddrLines.push(l);
+        if (laAddrLines.length === 2) break;
+      }
+      if (laAddrLines.length) trySet('f-lender-addr', laAddrLines.join(', '));
+    }
+
+    // Loan Type + FHA Case — append to notes
+    const vlLoanTypeRaw = vlVal('Loan\\s+Type');
+    const vlFhaCaseRaw  = vlVal('FHA\\s+Case\\s+Number');
+    const notesParts = [];
+    if (vlLoanTypeRaw && !/^N/i.test(vlLoanTypeRaw)) notesParts.push('Loan Type: ' + vlLoanTypeRaw);
+    if (vlFhaCaseRaw  && !/^N/i.test(vlFhaCaseRaw))  notesParts.push('FHA Case #: ' + vlFhaCaseRaw);
+
     // Notes: Access Instructions
     const vlAccessRaw = vlVal('Access\\s+Instructions?');
-    if (vlAccessRaw) trySet('f-notes', 'Access: ' + vlAccessRaw);
+    if (vlAccessRaw) notesParts.push('Access: ' + vlAccessRaw);
+    if (notesParts.length) {
+      const existingNotes = document.getElementById('f-notes');
+      const existing = existingNotes && existingNotes.value ? existingNotes.value + '\n' : '';
+      trySet('f-notes', existing + notesParts.join('\n'));
+    }
 
     return filled;
   }
