@@ -3588,10 +3588,7 @@ function renderOrders() {
           const isAppraiser = o.appraiserId && isLast;
           return `<span>${esc(m)}</span>${isAppraiser && webLinks ? webLinks : ''}`;
         }).join('')}</div>
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px">
-          <div class="order-pill ${STATUS_PILL[o.status]}">${STATUS_LABELS[o.status]}</div>
-          ${webLinks}
-        </div>
+        <div class="order-pill ${STATUS_PILL[o.status]}" style="margin-top:4px">${STATUS_LABELS[o.status]}</div>
       </div>
     </div>`;
   }).join('');
