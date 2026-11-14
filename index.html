@@ -3568,7 +3568,6 @@ function renderOrders() {
     if (o.due)         metas.push('Due ' + fmt(o.due));
     if (o.inspection)  metas.push('Insp: ' + fmt(o.inspection) + (o.inspectionTime ? ' ' + fmtTime(o.inspectionTime) : ''));
     if (o.fee)         metas.push('$' + o.fee);
-    if (o.appraiserId) metas.push(apName(o.appraiserId));
     // Website links for AMC and lender
     const amcRec    = o.amc    ? amcs.find(c => c.name === o.amc)       : null;
     const lenderRec = o.lender ? lenders.find(c => c.name === o.lender) : null;
@@ -3584,8 +3583,9 @@ function renderOrders() {
       <div class="order-card-body">
         <div class="order-addr">${esc(o.address)}</div>
         <div class="order-meta">${metas.map(m => `<span>${esc(m)}</span>`).join('')}</div>
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:${webLinks?'5px':'0'}">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px">
           <div class="order-pill ${STATUS_PILL[o.status]}">${STATUS_LABELS[o.status]}</div>
+          ${o.appraiserId ? `<span style="font-size:11px;color:var(--muted);font-weight:600">${esc(apName(o.appraiserId))}</span>` : ''}
           ${webLinks}
         </div>
       </div>
