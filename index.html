@@ -3569,11 +3569,25 @@ function renderOrders() {
     if (o.inspection)  metas.push('Insp: ' + fmt(o.inspection) + (o.inspectionTime ? ' ' + fmtTime(o.inspectionTime) : ''));
     if (o.fee)         metas.push('$' + o.fee);
     if (o.appraiserId) metas.push(apName(o.appraiserId));
+    // Website links for AMC and lender
+    const amcRec    = o.amc    ? amcs.find(c => c.name === o.amc)       : null;
+    const lenderRec = o.lender ? lenders.find(c => c.name === o.lender) : null;
+    const webLinks  = [amcRec, lenderRec].filter(c => c && c.website).map(c => {
+      const href  = c.website.startsWith('http') ? c.website : 'https://' + c.website;
+      const label = c.website.replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,'').split('/')[0];
+      return `<a href="${esc(href)}" target="_blank" rel="noopener"
+        onclick="event.stopPropagation()"
+        style="display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--accent);text-decoration:none;padding:2px 7px;border:1px solid var(--accent);border-radius:5px;white-space:nowrap;opacity:.85"
+        title="${esc(c.name)}">🔗 ${esc(label)}</a>`;
+    }).join('');
     return `<div class="${cardClass}" onclick="openDetail('${o.id}')">
       <div class="order-card-body">
         <div class="order-addr">${esc(o.address)}</div>
         <div class="order-meta">${metas.map(m => `<span>${esc(m)}</span>`).join('')}</div>
-        <div class="order-pill ${STATUS_PILL[o.status]}">${STATUS_LABELS[o.status]}</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:${webLinks?'5px':'0'}">
+          <div class="order-pill ${STATUS_PILL[o.status]}">${STATUS_LABELS[o.status]}</div>
+          ${webLinks}
+        </div>
       </div>
     </div>`;
   }).join('');
