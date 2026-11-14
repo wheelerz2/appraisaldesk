@@ -6173,6 +6173,119 @@ function extractOrderData(raw) {
   }
 
   // ════════════════════════════════════════════════════════════════════════
+  // NATIONWIDE PROPERTY & APPRAISAL (NPA) ORDER FORM
+  // Chrome-printed page from nationwideamc.com portal; Skia/PDF producer.
+  // Title field = "<jobnum>_appraiser"; text extracts cleanly via pdftotext.
+  // Detection: "nationwideamc.com" or "Nationwide Property & Appraisal"
+  //   with "Job" / "AMC-" pattern to avoid matching lender Nationwide.
+  // ════════════════════════════════════════════════════════════════════════
+  const isNPA = /nationwideamc\.com|Nationwide\s+Property\s+&\s+Appraisal/i.test(text);
+  if (isNPA) {
+    // AMC
+    trySet('f-amc', 'Nationwide Property & Appraisal');
+
+    // Lender — "Client displayed on report:\n<Name>\n<Address>"
+    const npaClientM = text.match(/Client\s+displayed\s+on\s+report\s*:\s*\n?\s*([^\n]{5,60})/i);
+    if (npaClientM) trySet('f-lender', npaClientM[1].trim());
+
+    // Lender address — lines after the lender name, before the next label
+    if (npaClientM) {
+      const afterClient = text.slice(text.indexOf(npaClientM[0]) + npaClientM[0].length);
+      const addrLines = [];
+      for (const line of afterClient.split('\n').map(l => l.trim()).filter(Boolean)) {
+        if (/^[A-Z][a-z]/.test(line) && /\d/.test(line)) { addrLines.push(line); continue; }
+        if (addrLines.length && /\d{5}/.test(line)) { addrLines.push(line); break; }
+        if (addrLines.length) break;
+        if (/Loan\s+Type|Intended|AMC|Due\s+Date|JobType/i.test(line)) break;
+      }
+      if (addrLines.length) trySet('f-lender-addr', addrLines.join(', '));
+    }
+
+    // Loan Number — "Loan #: A00372260524175"
+    const npaLoanM = text.match(/Loan\s+#\s*:\s*([\w\-]{4,30})/i);
+    if (npaLoanM && !/N\/A/i.test(npaLoanM[1])) trySet('f-loannum', npaLoanM[1].trim());
+
+    // AMC Order ID — "AMC-19-0175" pattern near Reference# or as standalone
+    const npaAmcIdM = text.match(/(?:Reference\s*#\s*:?\s*)?(AMC-[\w\-]+)/i)
+                   || text.match(/\b(AMC-\d[\w\-]+)\b/i);
+    if (npaAmcIdM) trySet('f-amcid', npaAmcIdM[1].trim());
+
+    // Property address — "Address 1:\n115-05 Mexico Street" or block before "City:"
+    const npaAddr1M = text.match(/Address\s*1\s*:\s*\n?\s*([^\n]{5,60})/i);
+    const npaCityM  = text.match(/City\s*:\s*\n?\s*([^\n]{2,40})/i);
+    const npaStateM = text.match(/State\s*:\s*\n?\s*([A-Z]{2})/i);
+    const npaZipM   = text.match(/Zip\s+Code\s*:\s*(\d{5})/i);
+    // Also try the prominent address block before "Property Types:"
+    const npaAddrBlockM = text.match(/(\d[\w\-]+ [A-Za-z][^\n]{3,50})\n([A-Za-z][^\n]{2,40})\nZip Code:/i);
+    if (npaAddrBlockM) {
+      const street = npaAddrBlockM[1].trim();
+      const city   = npaAddrBlockM[2].trim();
+      const state  = npaStateM ? npaStateM[1] : 'NY';
+      const zip    = npaZipM   ? npaZipM[1]   : '';
+      setAddressFields(`${street}, ${city} ${state} ${zip}`.trim());
+    } else if (npaAddr1M && npaCityM) {
+      const street = npaAddr1M[1].trim();
+      const city   = npaCityM[1].trim();
+      const state  = npaStateM ? npaStateM[1] : 'NY';
+      const zip    = npaZipM   ? npaZipM[1]   : '';
+      setAddressFields(`${street}, ${city} ${state} ${zip}`.trim());
+    }
+
+    // Form type — "Product Type: Appraisal URAR" or "JobType: ... (UAD 3.6)"
+    const npaFormM = text.match(/Product\s+Type\s*:\s*Appraisal\s+([\w\s]{2,20})/i)
+                  || text.match(/JobType\s*:\s*[\w\s]+?\((UAD[\s\d.]+)\)/i);
+    if (npaFormM) {
+      const fType = detectFormType(npaFormM[1]);
+      if (fType) trySet('f-type', fType);
+    }
+
+    // Purpose — "Intended Use: Refinance" or inline label
+    const npaPurposeM = text.match(/Intended\s+Use\s*:\s*([^\n]{3,40})/i)
+                     || text.match(/\b(Refinance|Purchase|Mortgage\s+Financing)\b/i);
+    if (npaPurposeM) trySet('f-purpose', normalizePurpose(npaPurposeM[1]));
+
+    // Due date
+    const npaDueM = text.match(/Due\s+Date\s*:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
+    if (npaDueM) trySet('f-due', normalizeDate(npaDueM[1]));
+
+    // Order date — "Assigned Date: 11/10/2026"
+    const npaOrderDateM = text.match(/Assigned\s+Date\s*:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
+    if (npaOrderDateM) trySet('f-order-date', normalizeDate(npaOrderDateM[1]));
+
+    // Inspection date + time — "Inspection Date: 11/14/2026 11:00:00 am"
+    const npaInspM = text.match(/Inspection\s+Date\s*:\s*(\d{1,2}\/\d{1,2}\/\d{4})\s*(\d{1,2}:\d{2}(?::\d{2})?\s*[ap]m)/i);
+    if (npaInspM) {
+      trySet('f-inspection', normalizeDate(npaInspM[1]));
+      trySet('f-inspection-time', npaInspM[2].replace(/:00\s/, ' ').trim());
+    }
+
+    // Borrower / contact — "Borrower: Mary Gaffney"
+    const npaBorrowerM = text.match(/Borrower\s*:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i);
+    if (npaBorrowerM) setBorrowerFields([npaBorrowerM[1].trim()]);
+
+    // Phone — Cell# first, then Phone#
+    const npaCellM  = text.match(/Cell\s*#\s*[\s:]*(\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4})/i);
+    const npaPhoneM = text.match(/Phone\s*#\s*[\s:]*(\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4})/i);
+    const npaPhone  = npaCellM || npaPhoneM;
+    if (npaPhone && !/N\/A/i.test(npaPhone[1])) trySet('f-phone', npaPhone[1].trim());
+
+    // Email — borrower email (skip AMC email)
+    const npaEmails = [...text.matchAll(/\b([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\b/g)];
+    for (const em of npaEmails) {
+      const addr = em[1].toLowerCase();
+      if (!addr.includes('nationwideamc') && !addr.includes('rhappraisal') && addr !== 'na@na.com') {
+        trySet('f-email', em[1]); break;
+      }
+    }
+
+    // Appraiser fee — "Total Appraiser Fee: $500.00"
+    const npaFeeM = text.match(/Total\s+Appraiser\s+Fee\s*:\s*\$?([\d,]+\.?\d*)/i);
+    if (npaFeeM) trySet('f-fee', npaFeeM[1].replace(/,/g, ''));
+
+    return filled;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
   // A.L.S. APPRAISAL MANAGEMENT SERVICE ORDER FORM
   // Detected by: "Appraisal Services Order Form" title or ALS AMC header or
   // the LENDER: block + Nationwide pattern in partially-decoded PDFs.
