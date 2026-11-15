@@ -3243,7 +3243,7 @@ function seedData() {
 // ══════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════
-let filters = { status: 'all', appraiser: 'all', type: 'all', amc: 'all', lender: 'all' };
+let filters = { status: '__open__', appraiser: 'all', type: 'all', amc: 'all', lender: 'all' };
 let calFilters = { appraiser: 'all', amc: 'all', lender: 'all' };
 let calShowDue = true;
 let sortMode = 'date';
@@ -3628,8 +3628,10 @@ function buildSidebarFilters() {
   apSel.innerHTML = '<option value="all">All Appraisers</option>' +
     appraisers.map(a => `<option value="${a.id}"${filters.appraiser===a.id?' selected':''}>${esc(a.name)}</option>`).join('');
 
-  // AMC filter buttons
-  const amcNames = [...new Set(myOrders.map(o => o.amc).filter(Boolean))];
+  // AMC filter buttons — sorted by order count descending
+  const amcNames = [...new Set(myOrders.map(o => o.amc).filter(Boolean))]
+    .sort((a, b) => myOrders.filter(o=>(o.amc||'').toLowerCase()===b.toLowerCase()).length
+                  - myOrders.filter(o=>(o.amc||'').toLowerCase()===a.toLowerCase()).length);
   const amcEl = document.getElementById('amc-filters');
   amcEl.innerHTML = `<button class="filter-btn${filters.amc==='all'?' active':''}" onclick="setAmcFilter('all')">
     <span class="filter-label">All AMCs</span></button>` +
@@ -3643,8 +3645,10 @@ function buildSidebarFilters() {
     `<button class="filter-btn${filters.amc==='__none__'?' active':''}" onclick="setAmcFilter('__none__')">
       <span class="filter-label" style="font-style:italic;color:var(--muted)">No AMC</span></button>`;
 
-  // Lender filter buttons
-  const lenderNames = [...new Set(myOrders.map(o => o.lender).filter(Boolean))];
+  // Lender filter buttons — sorted by order count descending
+  const lenderNames = [...new Set(myOrders.map(o => o.lender).filter(Boolean))]
+    .sort((a, b) => myOrders.filter(o=>(o.lender||'').toLowerCase()===b.toLowerCase()).length
+                  - myOrders.filter(o=>(o.lender||'').toLowerCase()===a.toLowerCase()).length);
   const lenderEl = document.getElementById('lender-filters');
   lenderEl.innerHTML = `<button class="filter-btn${filters.lender==='all'?' active':''}" onclick="setLenderFilter('all')">
     <span class="filter-label">All Lenders</span></button>` +
