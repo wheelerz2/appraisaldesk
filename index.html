@@ -2219,6 +2219,7 @@ body.is-admin .admin-only { display: block !important; }
     <button class="btn-edit" style="background:var(--sage);color:#fff;border-color:var(--sage)" onclick="printInvoice(detailOrderId)">🖨 Invoice</button>
     <button class="btn-edit" style="background:#2563eb;color:#fff;border-color:#2563eb" onclick="openPaymentModal(detailOrderId)">💳 Payment</button>
     <button class="btn-edit" id="sms-appraiser-btn" style="background:#1b8a4a;color:#fff;border-color:#1b8a4a;display:none" onclick="smsAppraiser(detailOrderId)">📱 Text Appraiser</button>
+    <button class="btn-edit" id="email-appraiser-btn" style="background:#7c3aed;color:#fff;border-color:#7c3aed;display:none" onclick="emailAppraiser(detailOrderId)">✉️ Email Appraiser</button>
     <button class="btn-delete" onclick="deleteCurrentOrder()">Delete</button>
   </div>
 </div>
@@ -3684,12 +3685,12 @@ function openDetail(id) {
   document.getElementById('detail-addr').textContent   = o.address || '—';
   document.getElementById('detail-client').textContent = o.client  || '';
 
-  // Show SMS button only when assigned appraiser has a phone number
-  const smsBtn = document.getElementById('sms-appraiser-btn');
-  if (smsBtn) {
-    const ap = appraisers.find(a => a.id === o.appraiserId);
-    smsBtn.style.display = (ap && ap.phone) ? '' : 'none';
-  }
+  // Show SMS / Email buttons only when appraiser has phone / email on file
+  const ap = appraisers.find(a => a.id === o.appraiserId);
+  const smsBtn   = document.getElementById('sms-appraiser-btn');
+  const emailBtn = document.getElementById('email-appraiser-btn');
+  if (smsBtn)   smsBtn.style.display   = (ap && ap.phone) ? '' : 'none';
+  if (emailBtn) emailBtn.style.display = (ap && ap.email) ? '' : 'none';
 
   const body = document.getElementById('detail-body');
   body.innerHTML = `
@@ -3932,6 +3933,42 @@ function smsAppraiser(id) {
   const body  = encodeURIComponent(parts.join('\n'));
   window.open(`sms:${phone}?body=${body}`, '_blank');
 }
+function emailAppraiser(id) {
+  const o  = orders.find(x => x.id === id);
+  if (!o) return;
+  const ap = appraisers.find(a => a.id === o.appraiserId);
+  if (!ap || !ap.email) { toast('No email on file for this appraiser'); return; }
+
+  const subject = `New Order Assigned: ${o.address}`;
+
+  const lines = [`Hi ${ap.name.split(' ')[0]},`, '', `A new order has been assigned to you:`, ''];
+  lines.push(`Address:    ${o.address}`);
+  if (o.due)        lines.push(`Due Date:   ${fmt(o.due)}`);
+  if (o.inspection) lines.push(`Inspection: ${fmt(o.inspection)}${o.inspectionTime ? ' at ' + fmtTime(o.inspectionTime) : ''}`);
+  if (o.type)       lines.push(`Form:       ${o.type}`);
+  if (o.purpose)    lines.push(`Purpose:    ${o.purpose}`);
+  if (o.fee)        lines.push(`Fee:        $${o.fee}`);
+  if (o.lender)     lines.push(`Lender:     ${o.lender}`);
+  if (o.amc)        lines.push(`AMC:        ${o.amc}`);
+  if (o.loanNum)    lines.push(`Loan #:     ${o.loanNum}`);
+
+  // Contact info
+  const contactName  = o.inspContact || o.contactName || o.client;
+  const contactPhone = o.inspContactPhone || o.contactPhone || o.phone;
+  if (contactName || contactPhone) {
+    lines.push('');
+    lines.push(`Contact:    ${[contactName, contactPhone].filter(Boolean).join(' — ')}`);
+  }
+  if (o.email) lines.push(`Email:      ${o.email}`);
+
+  if (o.notes) { lines.push(''); lines.push(`Notes: ${o.notes}`); }
+
+  lines.push('', 'Thank you,', 'RH Appraisal');
+
+  const mailto = `mailto:${encodeURIComponent(ap.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`;
+  window.open(mailto, '_blank');
+}
+
 function deleteCurrentOrder() {
   confirmAction('Delete this order? This cannot be undone.', () => {
     orders = orders.filter(x => x.id !== detailOrderId);
