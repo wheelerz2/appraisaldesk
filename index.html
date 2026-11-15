@@ -2218,6 +2218,7 @@ body.is-admin .admin-only { display: block !important; }
     <button class="btn-edit" onclick="editCurrentOrder()">Edit Order</button>
     <button class="btn-edit" style="background:var(--sage);color:#fff;border-color:var(--sage)" onclick="printInvoice(detailOrderId)">🖨 Invoice</button>
     <button class="btn-edit" style="background:#2563eb;color:#fff;border-color:#2563eb" onclick="openPaymentModal(detailOrderId)">💳 Payment</button>
+    <button class="btn-edit" id="sms-appraiser-btn" style="background:#1b8a4a;color:#fff;border-color:#1b8a4a;display:none" onclick="smsAppraiser(detailOrderId)">📱 Text Appraiser</button>
     <button class="btn-delete" onclick="deleteCurrentOrder()">Delete</button>
   </div>
 </div>
@@ -3683,6 +3684,13 @@ function openDetail(id) {
   document.getElementById('detail-addr').textContent   = o.address || '—';
   document.getElementById('detail-client').textContent = o.client  || '';
 
+  // Show SMS button only when assigned appraiser has a phone number
+  const smsBtn = document.getElementById('sms-appraiser-btn');
+  if (smsBtn) {
+    const ap = appraisers.find(a => a.id === o.appraiserId);
+    smsBtn.style.display = (ap && ap.phone) ? '' : 'none';
+  }
+
   const body = document.getElementById('detail-body');
   body.innerHTML = `
     ${(function(){
@@ -3898,6 +3906,27 @@ function showInspectionPopup(orderId, onSave) {
 }
 
 function editCurrentOrder()   { const eid = detailOrderId; closeDetail(); openOrderModal(eid); }
+
+function smsAppraiser(id) {
+  const o  = orders.find(x => x.id === id);
+  if (!o) return;
+  const ap = appraisers.find(a => a.id === o.appraiserId);
+  if (!ap || !ap.phone) { toast('No phone number on file for this appraiser'); return; }
+
+  // Build message
+  const parts = [`New order assigned: ${o.address}`];
+  if (o.due)        parts.push(`Due: ${fmt(o.due)}`);
+  if (o.inspection) parts.push(`Inspection: ${fmt(o.inspection)}${o.inspectionTime ? ' at ' + fmtTime(o.inspectionTime) : ''}`);
+  if (o.type)       parts.push(`Form: ${o.type}`);
+  if (o.fee)        parts.push(`Fee: $${o.fee}`);
+  if (o.lender)     parts.push(`Lender: ${o.lender}`);
+  if (o.amc)        parts.push(`AMC: ${o.amc}`);
+  parts.push('— RH Appraisal');
+
+  const phone = ap.phone.replace(/\D/g, '');
+  const body  = encodeURIComponent(parts.join('\n'));
+  window.open(`sms:${phone}?body=${body}`, '_blank');
+}
 function deleteCurrentOrder() {
   confirmAction('Delete this order? This cannot be undone.', () => {
     orders = orders.filter(x => x.id !== detailOrderId);
