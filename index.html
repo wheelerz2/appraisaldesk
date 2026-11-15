@@ -3921,6 +3921,11 @@ function smsAppraiser(id) {
   if (o.fee)        parts.push(`Fee: $${o.fee}`);
   if (o.lender)     parts.push(`Lender: ${o.lender}`);
   if (o.amc)        parts.push(`AMC: ${o.amc}`);
+  // Contact / borrower
+  const contactName  = o.inspContact  || o.contactName || o.client;
+  const contactPhone = o.inspContactPhone || o.contactPhone || o.phone;
+  if (contactName)  parts.push(`Contact: ${contactName}${contactPhone ? ' ' + contactPhone : ''}`);
+  else if (contactPhone) parts.push(`Contact: ${contactPhone}`);
   parts.push('— RH Appraisal');
 
   const phone = ap.phone.replace(/\D/g, '');
