@@ -4379,6 +4379,28 @@ function saveOrder() {
   }
 
   _sbUpsertOrder(savedOrder);
+
+  // ── Sync lender/AMC address & phone back to company records ──────────
+  if (data.lender) {
+    const li = lenders.findIndex(c => c.name.toLowerCase() === data.lender.toLowerCase());
+    if (li < 0) {
+      const newCo = { id: uid(), name: data.lender, contact:'', phone: data.lenderPhone||'', email:'', website:'', address: data.lenderAddr||'', notes:'' };
+      lenders.push(newCo); _sbUpsertLender(newCo);
+    } else {
+      const rec = lenders[li]; let changed = false;
+      if (data.lenderAddr  && !rec.address) { rec.address = data.lenderAddr;  changed = true; }
+      if (data.lenderPhone && !rec.phone)   { rec.phone   = data.lenderPhone; changed = true; }
+      if (changed) _sbUpsertLender(rec);
+    }
+  }
+  if (data.amc) {
+    const ai = amcs.findIndex(c => c.name.toLowerCase() === data.amc.toLowerCase());
+    if (ai < 0) {
+      const newCo = { id: uid(), name: data.amc, contact:'', phone:'', email:'', website:'', address:'', notes:'' };
+      amcs.push(newCo); _sbUpsertAmc(newCo);
+    }
+  }
+
   closeModal();
   closeDetail();
   if (currentPage === 'orders') { buildSidebarFilters(); renderOrders(); }
@@ -4445,25 +4467,50 @@ function acSelect(type, name) {
 
 function acAddNew(type, name) {
   const newCo = { id: uid(), name, contact:'', phone:'', email:'', website:'', notes:'' };
-  if (type === 'lender') { lenders.push(newCo); _sbUpsertLender(newCo); }
-  else                   { amcs.push(newCo);    _sbUpsertAmc(newCo); }
+  // Pull address/phone from form if adding a lender
+  if (type === 'lender') {
+    const addr  = document.getElementById('f-lender-addr')?.value.trim()  || '';
+    const phone = document.getElementById('f-lender-phone')?.value.trim() || '';
+    if (addr)  newCo.address = addr;
+    if (phone) newCo.phone   = phone;
+    lenders.push(newCo); _sbUpsertLender(newCo);
+  } else {
+    amcs.push(newCo); _sbUpsertAmc(newCo);
+  }
   document.getElementById('f-' + type).value = name;
   document.getElementById('ac-' + type).classList.remove('open');
   toast(`"${name}" saved to ${type === 'lender' ? 'Lenders' : 'AMCs'}`);
 }
 
-// Auto-save a company extracted from a PDF if it's not already in the database
+// Auto-save a company extracted from a PDF if it's not already in the database.
+// Also updates an existing record if it's missing address/phone and the form has them.
 function autoSaveExtractedCompany(type) {
   const el = document.getElementById('f-' + type);
   if (!el || !el.value.trim()) return;
   const name = el.value.trim();
-  const db = type === 'lender' ? lenders : amcs;
-  const exists = db.some(c => c.name.toLowerCase() === name.toLowerCase());
-  if (!exists) {
-    const newCo = { id: uid(), name, contact:'', phone:'', email:'', website:'', notes:'' };
+  const db   = type === 'lender' ? lenders : amcs;
+  const idx  = db.findIndex(c => c.name.toLowerCase() === name.toLowerCase());
+
+  // Extra fields only available for lenders in the order form
+  const addr  = type === 'lender' ? (document.getElementById('f-lender-addr')?.value.trim()  || '') : '';
+  const phone = type === 'lender' ? (document.getElementById('f-lender-phone')?.value.trim() || '') : '';
+
+  if (idx < 0) {
+    // Brand new — create with whatever address/phone the form has
+    const newCo = { id: uid(), name, contact:'', phone: phone||'', email:'', website:'', address: addr||'', notes:'' };
     if (type === 'lender') { lenders.push(newCo); _sbUpsertLender(newCo); }
     else                   { amcs.push(newCo);    _sbUpsertAmc(newCo); }
     toast(`✚ "${name}" added to ${type === 'lender' ? 'Lenders' : 'AMCs'}`);
+  } else {
+    // Existing record — fill in address/phone if currently blank
+    const rec     = db[idx];
+    let   changed = false;
+    if (addr  && !rec.address) { rec.address = addr;  changed = true; }
+    if (phone && !rec.phone)   { rec.phone   = phone; changed = true; }
+    if (changed) {
+      if (type === 'lender') _sbUpsertLender(rec);
+      else                   _sbUpsertAmc(rec);
+    }
   }
 }
 
