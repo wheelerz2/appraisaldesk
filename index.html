@@ -2465,6 +2465,13 @@ body.is-admin .admin-only { display: block !important; }
           <input type="tel" id="f-insp-contact-phone" placeholder="(212) 555-0100">
         </div>
       </div>
+      <div class="form-row">
+        <div class="field">
+          <label>Inspection Contact Email</label>
+          <input type="email" id="f-insp-contact-email" placeholder="contact@email.com">
+        </div>
+        <div class="field"></div>
+      </div>
       <div class="form-row single">
         <div class="field" style="max-width:220px">
           <label>Fee Split % <span style="font-weight:400;color:var(--muted)">(appraiser's share)</span></label>
@@ -3740,7 +3747,7 @@ function openDetail(id) {
         <div class="detail-field"><label>Appraiser Paid</label><span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${o.appraiserPaid ? `<span style="color:var(--green,#2a9d5c);font-weight:600">✓ Paid ${fmt(o.appraiserPaid)}</span> <button class="btn-secondary" style="font-size:11px;padding:2px 8px" onclick="markAppraiserPaid('${id}',false)">Undo</button>` : `<span style="color:var(--muted)">Not paid</span> <button class="btn-primary" style="font-size:12px;padding:4px 10px" onclick="markAppraiserPaid('${id}',true)">Mark Paid</button>`}</span></div>
         <div class="detail-field"><label>Due Date</label><span>${fmt(o.due)}</span></div>
         <div class="detail-field"><label>Inspection</label><span>${fmt(o.inspection)||'—'}${o.inspectionTime ? ' <small style="color:var(--muted)">'+fmtTime(o.inspectionTime)+'</small>' : ''}${o.inspection ? `<button class="outlook-cal-btn" onclick="openOutlookModal('${id}')">📅 Calendar</button>` : ''}</span></div>
-        ${(o.inspContact||o.inspContactPhone) ? `<div class="detail-field"><label>Insp. Contact</label><span>${esc(o.inspContact||'')}${o.inspContact&&o.inspContactPhone?' · ':''}${esc(o.inspContactPhone||'')}</span></div>` : ''}
+        ${(o.inspContact||o.inspContactPhone||o.inspContactEmail) ? `<div class="detail-field"><label>Insp. Contact</label><span>${esc(o.inspContact||'')}${o.inspContact&&o.inspContactPhone?' · ':''}${esc(o.inspContactPhone||'')}${o.inspContactEmail ? (o.inspContact||o.inspContactPhone?' · ':'')+`<a href="mailto:${esc(o.inspContactEmail)}" onclick="event.stopPropagation()" style="color:var(--accent)">${esc(o.inspContactEmail)}</a>` : ''}</span></div>` : ''}
         <div class="detail-field"><label>Appraiser</label><span>${esc(apName(o.appraiserId))}</span></div>
       </div>
     </div>
@@ -3955,11 +3962,12 @@ function emailAppraiser(id) {
   // Contact info
   const contactName  = o.inspContact || o.contactName || o.client;
   const contactPhone = o.inspContactPhone || o.contactPhone || o.phone;
+  const contactEmail = o.inspContactEmail || o.email;
   if (contactName || contactPhone) {
     lines.push('');
     lines.push(`Contact:    ${[contactName, contactPhone].filter(Boolean).join(' — ')}`);
   }
-  if (o.email) lines.push(`Email:      ${o.email}`);
+  if (contactEmail) lines.push(`Email:      ${contactEmail}`);
 
   if (o.notes) { lines.push(''); lines.push(`Notes: ${o.notes}`); }
 
@@ -4111,6 +4119,7 @@ function openOrderModal(id) {
     document.getElementById('f-inspection-time').value = o.inspectionTime  || '';
     document.getElementById('f-insp-contact').value       = o.inspContact      || '';
     document.getElementById('f-insp-contact-phone').value = o.inspContactPhone || '';
+    document.getElementById('f-insp-contact-email').value = o.inspContactEmail || '';
     document.getElementById('f-status').value     = o.status     || 'new';
     document.getElementById('f-appraiser').value  = o.appraiserId|| '';
     document.getElementById('f-notes').value      = o.notes      || '';
@@ -4121,7 +4130,7 @@ function openOrderModal(id) {
     setBorrowerFields([]);
     toggleContractSection();
     ['f-street','f-unit','f-city','f-state','f-zip','f-phone','f-email','f-contact-name','f-contact-phone','f-lender','f-lender-addr','f-lender-phone','f-amc','f-loannum','f-amcid','f-fha-case','f-contract-price','f-contract-date',
-     'f-proptype','f-type','f-purpose','f-fee','f-order-date','f-order-sent','f-due','f-inspection','f-inspection-time','f-insp-contact','f-insp-contact-phone','f-notes'].forEach(id => {
+     'f-proptype','f-type','f-purpose','f-fee','f-order-date','f-order-sent','f-due','f-inspection','f-inspection-time','f-insp-contact','f-insp-contact-phone','f-insp-contact-email','f-notes'].forEach(id => {
       document.getElementById(id).value = '';
     });
     document.getElementById('f-status').value = 'new';
@@ -4238,6 +4247,7 @@ function saveOrder() {
     inspectionTime:     document.getElementById('f-inspection-time').value,
     inspContact:        document.getElementById('f-insp-contact').value.trim(),
     inspContactPhone:   document.getElementById('f-insp-contact-phone').value.trim(),
+    inspContactEmail:   document.getElementById('f-insp-contact-email').value.trim(),
     status:      document.getElementById('f-status').value,
     appraiserId: document.getElementById('f-appraiser').value,
     notes:       document.getElementById('f-notes').value.trim(),
