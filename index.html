@@ -1668,7 +1668,7 @@ body.is-admin .admin-only { display: block !important; }
 
 <!-- NAV -->
 <nav id="nav">
-  <div id="nav-brand">Appraisal<span>Desk</span><small id="nav-version" style="font-size:10px;font-weight:400;opacity:.55;margin-left:6px;letter-spacing:.03em;font-family:inherit">v2.0</small></div>
+  <div id="nav-brand" onclick="refreshFromDb()" title="Click to refresh data" style="cursor:pointer">Appraisal<span>Desk</span><small id="nav-version" style="font-size:10px;font-weight:400;opacity:.55;margin-left:6px;letter-spacing:.03em;font-family:inherit">v2.0</small></div>
   <div id="nav-tabs">
     <button class="nav-tab active" onclick="showPage('orders')">Orders</button>
     <button class="nav-tab" onclick="showPage('map')">🗺 Map</button>
@@ -2482,7 +2482,7 @@ body.is-admin .admin-only { display: block !important; }
       <div class="form-row">
         <div class="field">
           <label>Status</label>
-          <select id="f-status">
+          <select id="f-status" onchange="_autoSaveClear();_autoSaveNow();">
             <option value="new">New</option>
             <option value="inspection">Inspection Scheduled</option>
             <option value="inspected">Inspected</option>
@@ -2495,7 +2495,7 @@ body.is-admin .admin-only { display: block !important; }
         </div>
         <div class="field">
           <label>Assign Appraiser</label>
-          <select id="f-appraiser" onchange="applyAppraiserSplit(this.value)">
+          <select id="f-appraiser" onchange="applyAppraiserSplit(this.value);_autoSaveClear();_autoSaveNow();">
             <option value="">— Unassigned —</option>
           </select>
         </div>
@@ -3161,6 +3161,29 @@ async function initFromSupabase() {
   } finally {
     const el = document.getElementById('sb-loading');
     if (el) el.remove();
+  }
+}
+
+async function refreshFromDb() {
+  if (!_sbHasConfig()) { toast('No database configured'); return; }
+  const brand = document.getElementById('nav-brand');
+  if (brand) brand.style.opacity = '0.5';
+  try {
+    const [ordersData, appraisersData, amcsData, lendersData] = await Promise.all([
+      sbLoad('orders'), sbLoad('appraisers'), sbLoad('amcs'), sbLoad('lenders'),
+    ]);
+    orders     = ordersData;
+    appraisers = appraisersData;
+    amcs       = amcsData;
+    lenders    = lendersData;
+    buildSidebarFilters();
+    renderOrders();
+    if (currentPage === 'calendar') renderCalendar();
+    toast('✓ Data refreshed');
+  } catch(e) {
+    toast('⚠ Refresh failed: ' + (e.message || e));
+  } finally {
+    if (brand) brand.style.opacity = '';
   }
 }
 
