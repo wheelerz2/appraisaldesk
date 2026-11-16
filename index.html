@@ -2336,12 +2336,26 @@ body.is-admin .admin-only { display: block !important; }
       </div>
       <div class="form-row">
         <div class="field">
-          <label>Lender Address</label>
-          <input type="text" id="f-lender-addr" placeholder="e.g. 12000 Horizon Way, Mount Laurel, NJ 08054">
+          <label>Lender Street</label>
+          <input type="text" id="f-lender-street" placeholder="e.g. 50 Charles Lindbergh Blvd, Suite 602">
         </div>
         <div class="field">
           <label>Lender Phone</label>
           <input type="text" id="f-lender-phone" placeholder="e.g. 856-533-4310" style="font-family:'DM Mono',monospace">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field" style="flex:2">
+          <label>Lender City</label>
+          <input type="text" id="f-lender-city" placeholder="e.g. Uniondale">
+        </div>
+        <div class="field" style="flex:0 0 70px">
+          <label>State</label>
+          <input type="text" id="f-lender-state" placeholder="NY" maxlength="2" style="text-transform:uppercase">
+        </div>
+        <div class="field" style="flex:0 0 90px">
+          <label>Zip</label>
+          <input type="text" id="f-lender-zip" placeholder="11553" maxlength="10" style="font-family:'DM Mono',monospace">
         </div>
       </div>
       <div class="form-row">
@@ -4116,7 +4130,33 @@ function openOrderModal(id) {
     document.getElementById('f-contact-name').value  = o.contactName  || '';
     document.getElementById('f-contact-phone').value = o.contactPhone || '';
     document.getElementById('f-lender').value      = o.lender      || '';
-    document.getElementById('f-lender-addr').value = o.lenderAddr  || '';
+    // Split lender address into separate fields; support old combined lenderAddr string
+    (function() {
+      const street = o.lenderStreet || '';
+      const city   = o.lenderCity   || '';
+      const state  = o.lenderState  || '';
+      const zip    = o.lenderZip    || '';
+      if (street || city || state || zip) {
+        document.getElementById('f-lender-street').value = street;
+        document.getElementById('f-lender-city').value   = city;
+        document.getElementById('f-lender-state').value  = state;
+        document.getElementById('f-lender-zip').value    = zip;
+      } else if (o.lenderAddr) {
+        // Parse old combined address: "123 Main St, Springfield, IL 62701"
+        const m = o.lenderAddr.match(/^(.*?),\s*([^,]+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+        if (m) {
+          document.getElementById('f-lender-street').value = m[1].trim();
+          document.getElementById('f-lender-city').value   = m[2].trim();
+          document.getElementById('f-lender-state').value  = m[3].trim();
+          document.getElementById('f-lender-zip').value    = m[4].trim();
+        } else {
+          document.getElementById('f-lender-street').value = o.lenderAddr;
+          document.getElementById('f-lender-city').value   = '';
+          document.getElementById('f-lender-state').value  = '';
+          document.getElementById('f-lender-zip').value    = '';
+        }
+      }
+    })();
     document.getElementById('f-lender-phone').value= o.lenderPhone || '';
     document.getElementById('f-amc').value         = o.amc         || '';
     document.getElementById('f-loannum').value    = o.loanNum    || '';
@@ -4146,7 +4186,7 @@ function openOrderModal(id) {
   } else {
     setBorrowerFields([]);
     toggleContractSection();
-    ['f-street','f-unit','f-city','f-state','f-zip','f-phone','f-email','f-contact-name','f-contact-phone','f-lender','f-lender-addr','f-lender-phone','f-amc','f-loannum','f-amcid','f-fha-case','f-contract-price','f-contract-date',
+    ['f-street','f-unit','f-city','f-state','f-zip','f-phone','f-email','f-contact-name','f-contact-phone','f-lender','f-lender-street','f-lender-city','f-lender-state','f-lender-zip','f-lender-phone','f-amc','f-loannum','f-amcid','f-fha-case','f-contract-price','f-contract-date',
      'f-proptype','f-type','f-purpose','f-fee','f-order-date','f-order-sent','f-due','f-inspection','f-inspection-time','f-insp-contact','f-insp-contact-phone','f-insp-contact-email','f-notes'].forEach(id => {
       document.getElementById(id).value = '';
     });
@@ -4205,10 +4245,14 @@ function _autoSaveNow() {
     email:        document.getElementById('f-email').value.trim(),
     contactName:  document.getElementById('f-contact-name').value.trim(),
     contactPhone: document.getElementById('f-contact-phone').value.trim(),
-    lender:       document.getElementById('f-lender').value.trim(),
-    lenderAddr:   document.getElementById('f-lender-addr').value.trim(),
-    lenderPhone:  document.getElementById('f-lender-phone').value.trim(),
-    amc:          document.getElementById('f-amc').value.trim(),
+    lender:        document.getElementById('f-lender').value.trim(),
+    lenderStreet:  document.getElementById('f-lender-street').value.trim(),
+    lenderCity:    document.getElementById('f-lender-city').value.trim(),
+    lenderState:   document.getElementById('f-lender-state').value.trim().toUpperCase(),
+    lenderZip:     document.getElementById('f-lender-zip').value.trim(),
+    get lenderAddr() { return [this.lenderStreet, this.lenderCity, this.lenderState ? (this.lenderState + (this.lenderZip ? ' ' + this.lenderZip : '')) : this.lenderZip].filter(Boolean).join(', '); },
+    lenderPhone:   document.getElementById('f-lender-phone').value.trim(),
+    amc:           document.getElementById('f-amc').value.trim(),
     loanNum:      document.getElementById('f-loannum').value.trim(),
     amcOrderId:   document.getElementById('f-amcid').value.trim(),
     fhaCaseNum:   document.getElementById('f-fha-case').value.trim(),
@@ -4342,10 +4386,14 @@ function saveOrder() {
     email:        document.getElementById('f-email').value.trim(),
     contactName:  document.getElementById('f-contact-name').value.trim(),
     contactPhone: document.getElementById('f-contact-phone').value.trim(),
-    lender:       document.getElementById('f-lender').value.trim(),
-    lenderAddr:   document.getElementById('f-lender-addr').value.trim(),
-    lenderPhone:  document.getElementById('f-lender-phone').value.trim(),
-    amc:         document.getElementById('f-amc').value.trim(),
+    lender:        document.getElementById('f-lender').value.trim(),
+    lenderStreet:  document.getElementById('f-lender-street').value.trim(),
+    lenderCity:    document.getElementById('f-lender-city').value.trim(),
+    lenderState:   document.getElementById('f-lender-state').value.trim().toUpperCase(),
+    lenderZip:     document.getElementById('f-lender-zip').value.trim(),
+    get lenderAddr() { return [this.lenderStreet, this.lenderCity, this.lenderState ? (this.lenderState + (this.lenderZip ? ' ' + this.lenderZip : '')) : this.lenderZip].filter(Boolean).join(', '); },
+    lenderPhone:   document.getElementById('f-lender-phone').value.trim(),
+    amc:           document.getElementById('f-amc').value.trim(),
     loanNum:     document.getElementById('f-loannum').value.trim(),
     amcOrderId:  document.getElementById('f-amcid').value.trim(),
     fhaCaseNum:  document.getElementById('f-fha-case').value.trim(),
@@ -4384,12 +4432,16 @@ function saveOrder() {
   if (data.lender) {
     const li = lenders.findIndex(c => c.name.toLowerCase() === data.lender.toLowerCase());
     if (li < 0) {
-      const newCo = { id: uid(), name: data.lender, contact:'', phone: data.lenderPhone||'', email:'', website:'', address: data.lenderAddr||'', notes:'' };
+      const newCo = { id: uid(), name: data.lender, contact:'', phone: data.lenderPhone||'', email:'', website:'',
+        address: data.lenderStreet||'', city: data.lenderCity||'', state: data.lenderState||'', zip: data.lenderZip||'', notes:'' };
       lenders.push(newCo); _sbUpsertLender(newCo);
     } else {
       const rec = lenders[li]; let changed = false;
-      if (data.lenderAddr  && !rec.address) { rec.address = data.lenderAddr;  changed = true; }
-      if (data.lenderPhone && !rec.phone)   { rec.phone   = data.lenderPhone; changed = true; }
+      if (data.lenderStreet && !rec.address) { rec.address = data.lenderStreet; changed = true; }
+      if (data.lenderCity   && !rec.city)    { rec.city    = data.lenderCity;   changed = true; }
+      if (data.lenderState  && !rec.state)   { rec.state   = data.lenderState;  changed = true; }
+      if (data.lenderZip    && !rec.zip)     { rec.zip     = data.lenderZip;    changed = true; }
+      if (data.lenderPhone  && !rec.phone)   { rec.phone   = data.lenderPhone;  changed = true; }
       if (changed) _sbUpsertLender(rec);
     }
   }
@@ -4454,12 +4506,27 @@ function acSelect(type, name) {
   if (type === 'lender') {
     const rec = lenders.find(c => c.name === name);
     if (rec) {
-      const addrEl  = document.getElementById('f-lender-addr');
-      const phoneEl = document.getElementById('f-lender-phone');
-      // Build full address from stored fields
-      const parts = [rec.address, rec.city, rec.state ? (rec.zip ? rec.state + ' ' + rec.zip : rec.state) : rec.zip].filter(Boolean);
-      const fullAddr = parts.join(', ');
-      if (addrEl && fullAddr) addrEl.value = fullAddr;
+      const phoneEl  = document.getElementById('f-lender-phone');
+      const streetEl = document.getElementById('f-lender-street');
+      const cityEl   = document.getElementById('f-lender-city');
+      const stateEl  = document.getElementById('f-lender-state');
+      const zipEl    = document.getElementById('f-lender-zip');
+      // Fill separate address fields from stored lender record
+      if (rec.address || rec.city || rec.state || rec.zip) {
+        if (streetEl) streetEl.value = rec.address || '';
+        if (cityEl)   cityEl.value   = rec.city    || '';
+        if (stateEl)  stateEl.value  = rec.state   || '';
+        if (zipEl)    zipEl.value    = rec.zip      || '';
+      } else if (rec.address) {
+        // Old record with combined address string — parse it
+        const m = rec.address.match(/^(.*?),\s*([^,]+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+        if (m) {
+          if (streetEl) streetEl.value = m[1].trim();
+          if (cityEl)   cityEl.value   = m[2].trim();
+          if (stateEl)  stateEl.value  = m[3].trim();
+          if (zipEl)    zipEl.value    = m[4].trim();
+        } else if (streetEl) { streetEl.value = rec.address; }
+      }
       if (phoneEl && rec.phone && !phoneEl.value) phoneEl.value = rec.phone;
     }
   }
@@ -4469,10 +4536,16 @@ function acAddNew(type, name) {
   const newCo = { id: uid(), name, contact:'', phone:'', email:'', website:'', notes:'' };
   // Pull address/phone from form if adding a lender
   if (type === 'lender') {
-    const addr  = document.getElementById('f-lender-addr')?.value.trim()  || '';
-    const phone = document.getElementById('f-lender-phone')?.value.trim() || '';
-    if (addr)  newCo.address = addr;
-    if (phone) newCo.phone   = phone;
+    const street = document.getElementById('f-lender-street')?.value.trim() || '';
+    const city   = document.getElementById('f-lender-city')?.value.trim()   || '';
+    const state  = document.getElementById('f-lender-state')?.value.trim()  || '';
+    const zip    = document.getElementById('f-lender-zip')?.value.trim()    || '';
+    const phone  = document.getElementById('f-lender-phone')?.value.trim()  || '';
+    if (street) newCo.address = street;
+    if (city)   newCo.city    = city;
+    if (state)  newCo.state   = state;
+    if (zip)    newCo.zip     = zip;
+    if (phone)  newCo.phone   = phone;
     lenders.push(newCo); _sbUpsertLender(newCo);
   } else {
     amcs.push(newCo); _sbUpsertAmc(newCo);
@@ -4492,12 +4565,15 @@ function autoSaveExtractedCompany(type) {
   const idx  = db.findIndex(c => c.name.toLowerCase() === name.toLowerCase());
 
   // Extra fields only available for lenders in the order form
-  const addr  = type === 'lender' ? (document.getElementById('f-lender-addr')?.value.trim()  || '') : '';
-  const phone = type === 'lender' ? (document.getElementById('f-lender-phone')?.value.trim() || '') : '';
+  const lStreet = type === 'lender' ? (document.getElementById('f-lender-street')?.value.trim() || '') : '';
+  const lCity   = type === 'lender' ? (document.getElementById('f-lender-city')?.value.trim()   || '') : '';
+  const lState  = type === 'lender' ? (document.getElementById('f-lender-state')?.value.trim()  || '') : '';
+  const lZip    = type === 'lender' ? (document.getElementById('f-lender-zip')?.value.trim()    || '') : '';
+  const phone   = type === 'lender' ? (document.getElementById('f-lender-phone')?.value.trim()  || '') : '';
 
   if (idx < 0) {
     // Brand new — create with whatever address/phone the form has
-    const newCo = { id: uid(), name, contact:'', phone: phone||'', email:'', website:'', address: addr||'', notes:'' };
+    const newCo = { id: uid(), name, contact:'', phone: phone||'', email:'', website:'', address: lStreet||'', city: lCity||'', state: lState||'', zip: lZip||'', notes:'' };
     if (type === 'lender') { lenders.push(newCo); _sbUpsertLender(newCo); }
     else                   { amcs.push(newCo);    _sbUpsertAmc(newCo); }
     toast(`✚ "${name}" added to ${type === 'lender' ? 'Lenders' : 'AMCs'}`);
@@ -4505,8 +4581,11 @@ function autoSaveExtractedCompany(type) {
     // Existing record — fill in address/phone if currently blank
     const rec     = db[idx];
     let   changed = false;
-    if (addr  && !rec.address) { rec.address = addr;  changed = true; }
-    if (phone && !rec.phone)   { rec.phone   = phone; changed = true; }
+    if (lStreet && !rec.address) { rec.address = lStreet; changed = true; }
+    if (lCity   && !rec.city)    { rec.city    = lCity;   changed = true; }
+    if (lState  && !rec.state)   { rec.state   = lState;  changed = true; }
+    if (lZip    && !rec.zip)     { rec.zip     = lZip;    changed = true; }
+    if (phone   && !rec.phone)   { rec.phone   = phone;   changed = true; }
     if (changed) {
       if (type === 'lender') _sbUpsertLender(rec);
       else                   _sbUpsertAmc(rec);
@@ -6014,15 +6093,27 @@ function extractOrderData(raw) {
       const apNorm = normalize(apLenderName);
       const dbMatch = [...(lenders||[]), ...(amcs||[])].find(c => normalize(c.name||'') === apNorm);
       if (dbMatch) {
-        // Build address from stored fields
-        const parts = [dbMatch.address, dbMatch.city, dbMatch.state ? (dbMatch.state + (dbMatch.zip ? ' ' + dbMatch.zip : '')) : dbMatch.zip].filter(Boolean);
-        if (parts.length) trySet('f-lender-addr', parts.join(', '));
-        if (dbMatch.phone) trySet('f-lender-phone', dbMatch.phone);
+        // Fill separate fields from stored lender record
+        if (dbMatch.address) trySet('f-lender-street', dbMatch.address);
+        if (dbMatch.city)    trySet('f-lender-city',   dbMatch.city);
+        if (dbMatch.state)   trySet('f-lender-state',  dbMatch.state);
+        if (dbMatch.zip)     trySet('f-lender-zip',    dbMatch.zip);
+        if (dbMatch.phone)   trySet('f-lender-phone',  dbMatch.phone);
       } else {
         // Not in database — use what we extracted from the PDF
         if (apLenderAddr1) {
-          const fullAddr = apLenderCity ? apLenderAddr1 + ', ' + apLenderCity : apLenderAddr1;
-          trySet('f-lender-addr', fullAddr);
+          trySet('f-lender-street', apLenderAddr1);
+          if (apLenderCity) {
+            // Try to split "Springfield, IL 62701" into city/state/zip
+            const csz = apLenderCity.match(/^([^,]+),?\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+            if (csz) {
+              trySet('f-lender-city',  csz[1].trim());
+              trySet('f-lender-state', csz[2].trim());
+              trySet('f-lender-zip',   csz[3].trim());
+            } else {
+              trySet('f-lender-city', apLenderCity);
+            }
+          }
         }
         if (apLenderPhone) trySet('f-lender-phone', apLenderPhone);
       }
@@ -6263,7 +6354,20 @@ function extractOrderData(raw) {
         laAddrLines.push(l);
         if (laAddrLines.length === 2) break;
       }
-      if (laAddrLines.length) trySet('f-lender-addr', laAddrLines.join(', '));
+      if (laAddrLines.length) {
+        // laAddrLines[0] = street, laAddrLines[1] = "City, ST ZIP"
+        trySet('f-lender-street', laAddrLines[0]);
+        if (laAddrLines[1]) {
+          const csz = laAddrLines[1].match(/^([^,]+),?\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+          if (csz) {
+            trySet('f-lender-city',  csz[1].trim());
+            trySet('f-lender-state', csz[2].trim());
+            trySet('f-lender-zip',   csz[3].trim());
+          } else {
+            trySet('f-lender-city', laAddrLines[1]);
+          }
+        }
+      }
     }
 
     // Loan Type + FHA Case
@@ -6539,7 +6643,17 @@ function extractOrderData(raw) {
         if (addrLines.length) break;
         if (/Loan\s+Type|Intended|AMC|Due\s+Date|JobType/i.test(line)) break;
       }
-      if (addrLines.length) trySet('f-lender-addr', addrLines.join(', '));
+      if (addrLines.length) {
+        trySet('f-lender-street', addrLines[0]);
+        if (addrLines[1]) {
+          const csz = addrLines[1].match(/^([^,]+),?\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+          if (csz) {
+            trySet('f-lender-city',  csz[1].trim());
+            trySet('f-lender-state', csz[2].trim());
+            trySet('f-lender-zip',   csz[3].trim());
+          } else { trySet('f-lender-city', addrLines[1]); }
+        }
+      }
     }
 
     // Loan Number — "Loan #: A00372260524175"
@@ -6672,7 +6786,17 @@ function extractOrderData(raw) {
         }
         if (addrLines.length >= 2) break;
       }
-      if (addrLines.length) trySet('f-lender-addr', addrLines.join(', '));
+      if (addrLines.length) {
+        trySet('f-lender-street', addrLines[0]);
+        if (addrLines[1]) {
+          const csz = addrLines[1].match(/^([^,]+),?\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+          if (csz) {
+            trySet('f-lender-city',  csz[1].trim());
+            trySet('f-lender-state', csz[2].trim());
+            trySet('f-lender-zip',   csz[3].trim());
+          } else { trySet('f-lender-city', addrLines[1]); }
+        }
+      }
     }
 
     // Property Address — "Address: 3230 87TH ST, EAST ELMHURST NY 11369 (Queens County)"
@@ -6738,8 +6862,18 @@ function extractOrderData(raw) {
     // ── Lender address ───────────────────────────────────────────────────
     const lenderAddrM = text.match(/Lender\s+Address\s+([\s\S]+?)(?:Invoice\s*#|Ordered\s+By|LPA\s+Key|$)/i);
     if (lenderAddrM) {
-      const la = lenderAddrM[1].replace(/\s+/g, ' ').trim().replace(/,?\s*(Invoice\s*#.*|Ordered.*)/i, '');
-      trySet('f-lender-addr', la.trim());
+      const la = lenderAddrM[1].replace(/\s+/g, ' ').trim().replace(/,?\s*(Invoice\s*#.*|Ordered.*)/i, '').trim();
+      // Try to split "123 Main St, Springfield, IL 62701"
+      const laM = la.match(/^(.*?),\s*([^,]+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+      if (laM) {
+        trySet('f-lender-street', laM[1].trim());
+        trySet('f-lender-city',   laM[2].trim());
+        trySet('f-lender-state',  laM[3].trim());
+        trySet('f-lender-zip',    laM[4].trim());
+      } else {
+        // Fallback: put it all in street
+        trySet('f-lender-street', la);
+      }
     }
 
     // ── Loan # / File # ──────────────────────────────────────────────────
