@@ -2225,7 +2225,7 @@ body.is-admin .admin-only { display: block !important; }
 </div>
 
 <!-- ORDER MODAL -->
-<div id="modal-overlay" onclick="if(event.target===this){closeModal();closeDetail();}">
+<div id="modal-overlay">
   <div id="modal">
     <div id="modal-header">
       <div id="modal-title">New Order</div>
@@ -4151,7 +4151,106 @@ function closeModal() {
   editingOrderId = null;
   closeAllAC();
   clearUploadZone();
+  _autoSaveClear();
 }
+
+// ── Auto-save (edit mode only) ───────────────────────────────────────────────
+let _autoSaveTimer = null;
+
+function _autoSaveClear() {
+  if (_autoSaveTimer) { clearTimeout(_autoSaveTimer); _autoSaveTimer = null; }
+}
+
+function _autoSaveNow() {
+  if (!editingOrderId) return;
+  const idx = orders.findIndex(x => x.id === editingOrderId);
+  if (idx < 0) return;
+
+  // Gather all current field values (same logic as saveOrder minus validation)
+  const street = document.getElementById('f-street').value.trim();
+  const unit   = document.getElementById('f-unit').value.trim();
+  const city   = document.getElementById('f-city').value.trim();
+  const state  = document.getElementById('f-state').value.trim().toUpperCase();
+  const zip    = document.getElementById('f-zip').value.trim();
+  if (!street) return; // don't auto-save an order with no address
+  const addrParts = [street + (unit ? ' ' + unit : '')];
+  if (city) addrParts.push(city);
+  if (state && zip) addrParts.push(state + ' ' + zip);
+  else if (state) addrParts.push(state);
+  else if (zip) addrParts.push(zip);
+  const address = addrParts.join(', ');
+  const clients = getBorrowerNames();
+
+  const data = {
+    address, street, unit, city, state, zip,
+    clients, client: clients.join(' & '),
+    phone:        document.getElementById('f-phone').value.trim(),
+    email:        document.getElementById('f-email').value.trim(),
+    contactName:  document.getElementById('f-contact-name').value.trim(),
+    contactPhone: document.getElementById('f-contact-phone').value.trim(),
+    lender:       document.getElementById('f-lender').value.trim(),
+    lenderAddr:   document.getElementById('f-lender-addr').value.trim(),
+    lenderPhone:  document.getElementById('f-lender-phone').value.trim(),
+    amc:          document.getElementById('f-amc').value.trim(),
+    loanNum:      document.getElementById('f-loannum').value.trim(),
+    amcOrderId:   document.getElementById('f-amcid').value.trim(),
+    fhaCaseNum:   document.getElementById('f-fha-case').value.trim(),
+    contractPrice: document.getElementById('f-purpose').value === 'Purchase' ? (parseFloat(document.getElementById('f-contract-price').value) || '') : '',
+    contractDate:  document.getElementById('f-purpose').value === 'Purchase' ? (document.getElementById('f-contract-date').value || '') : '',
+    propType:     document.getElementById('f-proptype').value,
+    type:         document.getElementById('f-type').value,
+    purpose:      document.getElementById('f-purpose').value,
+    fee:          parseFloat(document.getElementById('f-fee').value) || 0,
+    feeSplit:     parseInt(document.getElementById('f-feesplit').value) || 100,
+    orderDate:    document.getElementById('f-order-date').value,
+    orderSent:    document.getElementById('f-order-sent').value,
+    due:          document.getElementById('f-due').value,
+    inspection:       document.getElementById('f-inspection').value,
+    inspectionTime:   document.getElementById('f-inspection-time').value,
+    inspContact:      document.getElementById('f-insp-contact').value.trim(),
+    inspContactPhone: document.getElementById('f-insp-contact-phone').value.trim(),
+    inspContactEmail: document.getElementById('f-insp-contact-email').value.trim(),
+    status:       document.getElementById('f-status').value,
+    appraiserId:  document.getElementById('f-appraiser').value,
+    notes:        document.getElementById('f-notes').value.trim(),
+  };
+
+  orders[idx] = { ...orders[idx], ...data };
+  _sbUpsertOrder(orders[idx]);
+
+  // Show subtle "Saved" badge in modal header
+  const title = document.getElementById('modal-title');
+  if (title) {
+    const badge = title.querySelector('.autosave-badge') || (() => {
+      const b = document.createElement('span');
+      b.className = 'autosave-badge';
+      b.style.cssText = 'margin-left:10px;font-size:11px;font-weight:400;color:#22c55e;opacity:0;transition:opacity 0.3s';
+      title.appendChild(b);
+      return b;
+    })();
+    badge.textContent = '✓ Saved';
+    badge.style.opacity = '1';
+    setTimeout(() => { badge.style.opacity = '0'; }, 2000);
+  }
+
+  // Refresh order list in background without closing modal
+  if (currentPage === 'orders') { buildSidebarFilters(); renderOrders(); }
+  if (currentPage === 'calendar') renderCalendar();
+}
+
+function _scheduleAutoSave() {
+  if (!editingOrderId) return; // new orders: only save on explicit Save button
+  _autoSaveClear();
+  _autoSaveTimer = setTimeout(_autoSaveNow, 1200);
+}
+
+// Wire up auto-save listeners once DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = document.getElementById('modal');
+  if (!modal) return;
+  modal.addEventListener('input',  _scheduleAutoSave);
+  modal.addEventListener('change', _scheduleAutoSave);
+});
 
 function clearUploadZone() {
   const inp = document.getElementById('upload-input');
