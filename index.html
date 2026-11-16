@@ -2896,25 +2896,23 @@ function _ensureLoginOverlay() {
         <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--accent);line-height:1">Appraisal<span style="color:var(--ink)">Desk</span></div>
         <div style="font-size:13px;color:var(--muted);margin-top:6px">Sign in to continue</div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:14px">
+      <form id="login-form" action="javascript:void(0)" onsubmit="doLogin()" style="display:flex;flex-direction:column;gap:14px">
         <div>
           <label style="font-size:12px;font-weight:600;color:var(--steel);display:block;margin-bottom:5px">Email</label>
-          <input id="login-email" type="email" placeholder="you@example.com" autocomplete="email"
-            style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink)"
-            onkeydown="if(event.key==='Enter')document.getElementById('login-password').focus()">
+          <input id="login-email" type="email" name="email" placeholder="you@example.com" autocomplete="username"
+            style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink)">
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:var(--steel);display:block;margin-bottom:5px">Password</label>
-          <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password"
-            style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink)"
-            onkeydown="if(event.key==='Enter')doLogin()">
+          <input id="login-password" type="password" name="password" placeholder="••••••••" autocomplete="current-password"
+            style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink)">
         </div>
         <div id="login-error" style="display:none;font-size:12px;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px"></div>
-        <button onclick="doLogin()" id="login-btn"
+        <button type="submit" id="login-btn"
           style="padding:11px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px">
           Sign In
         </button>
-      </div>
+      </form>
     </div>`;
   document.body.appendChild(div);
 }
@@ -2924,11 +2922,7 @@ function showLoginScreen() {
   const overlay = document.getElementById('login-overlay');
   if (overlay) {
     overlay.style.display = 'flex';
-    const e = document.getElementById('login-email');
-    const p = document.getElementById('login-password');
     const err = document.getElementById('login-error');
-    if (e) e.value = '';
-    if (p) p.value = '';
     if (err) err.style.display = 'none';
     const btn = document.getElementById('login-btn');
     if (btn) { btn.textContent = 'Sign In'; btn.disabled = false; }
@@ -6680,6 +6674,122 @@ function extractOrderData(raw) {
       if (!addr.includes('optonline') && !addr.includes('rhappraisal') && addr !== 'na@na.com') {
         trySet('f-email', em[1]); break;
       }
+    }
+
+    return filled;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  // MERCURY VMP  (vendors.mercuryvmp.com / Ridgewood Savings Bank etc.)
+  // ════════════════════════════════════════════════════════════════════════
+  const isMercury = /mercuryvmp\.com|Mercury\s+VMP|Tracking\s+#MERC-/i.test(text);
+  if (isMercury) {
+    // ── Lender ──────────────────────────────────────────────────────────
+    const lenderM = text.match(/Lender\s+Name\s+([^\n\r]+)/i);
+    if (lenderM) trySet('f-lender', lenderM[1].trim());
+
+    // ── Lender address ───────────────────────────────────────────────────
+    const lenderAddrM = text.match(/Lender\s+Address\s+([\s\S]+?)(?:Invoice\s*#|Ordered\s+By|LPA\s+Key|$)/i);
+    if (lenderAddrM) {
+      const la = lenderAddrM[1].replace(/\s+/g, ' ').trim().replace(/,?\s*(Invoice\s*#.*|Ordered.*)/i, '');
+      trySet('f-lender-addr', la.trim());
+    }
+
+    // ── Loan # / File # ──────────────────────────────────────────────────
+    const loanM = text.match(/Loan\s+#\s+([^\n\r]+)/i);
+    if (loanM) trySet('f-loannum', loanM[1].trim());
+
+    // ── AMC order ID (Tracking #) ────────────────────────────────────────
+    const trackM = text.match(/Tracking\s+#(MERC-\S+)/i);
+    if (trackM) trySet('f-amcid', trackM[1].trim());
+
+    // ── Property address (under "Property Information" section) ─────────
+    const propAddrM = text.match(/Property\s+Information[\s\S]{0,300}?Address\s+(\d[^\n\r]+)/i);
+    const cityM     = text.match(/Property\s+Information[\s\S]{0,500}?City\s+([^\n\r]+)/i)
+                   || text.match(/City\s+([^\n\r]+)/i);
+    const stateM    = text.match(/Property\s+Information[\s\S]{0,500}?State\s+([A-Z]{2})/i)
+                   || text.match(/\bState\s+([A-Z]{2})\b/i);
+    const zipM      = text.match(/Zip\s+Code\s+(\d{5})/i);
+    if (propAddrM) {
+      const street = propAddrM[1].trim();
+      const city   = cityM  ? cityM[1].trim()  : '';
+      const state  = stateM ? stateM[1].trim() : '';
+      const zip    = zipM   ? zipM[1].trim()   : '';
+      trySet('f-street', street);
+      trySet('f-city',   city);
+      trySet('f-state',  state);
+      trySet('f-zip',    zip);
+    }
+
+    // ── Form / product ───────────────────────────────────────────────────
+    const prodM = text.match(/Product\s+([^\n\r]+)/i);
+    if (prodM) {
+      const prod = prodM[1].trim();
+      if (/2055/i.test(prod))      trySet('f-type', '2055');
+      else if (/1004/i.test(prod)) trySet('f-type', '1004');
+      else if (/1073/i.test(prod)) trySet('f-type', '1073');
+      else if (/1025/i.test(prod)) trySet('f-type', '1025');
+    }
+
+    // ── Purpose ──────────────────────────────────────────────────────────
+    const purposeM = text.match(/Loan\s+Purpose\s+([^\n\r]+)/i);
+    if (purposeM) {
+      const p = purposeM[1].trim();
+      if (/refinance/i.test(p))       trySet('f-purpose', 'Refinance');
+      else if (/purchase/i.test(p))   trySet('f-purpose', 'Purchase');
+      else if (/equity|heloc/i.test(p)) trySet('f-purpose', 'Refinance');
+    }
+
+    // ── Fee ──────────────────────────────────────────────────────────────
+    const feeM = text.match(/Order\s+Fee\s+\$?([\d,]+(?:\.\d{2})?)/i);
+    if (feeM) trySet('f-fee', feeM[1].replace(/,/g,''));
+
+    // ── Due date ─────────────────────────────────────────────────────────
+    const dueM = text.match(/Due\s+Date\s+(\d{1,2}\/\d{1,2}\/\d{4})/i);
+    if (dueM) trySet('f-due', toISODate(dueM[1]));
+
+    // ── Order date (first date in History) ───────────────────────────────
+    const orderDateM = text.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})\s+\d{2}:\d{2}\s+[AP]M/i);
+    if (orderDateM) trySet('f-order-date', toISODate(orderDateM[1]));
+
+    // ── Borrower / contact ───────────────────────────────────────────────
+    const borrowerM = text.match(/Borrower:\s+([^\n\r]+)/i);
+    if (borrowerM) trySet('f-borrower-0', borrowerM[1].trim());
+
+    // ── Borrower phone ───────────────────────────────────────────────────
+    const cellM = text.match(/Cell#\s+([\d\-\(\)\s]+)/i);
+    const homeM = text.match(/Home:\s+([\d\-\(\)\s]+)/i);
+    const ph = (cellM || homeM);
+    if (ph) trySet('f-phone', ph[1].trim());
+
+    // ── Borrower email ───────────────────────────────────────────────────
+    const borrEmailM = text.match(/E-mail:\s+([^\s\n\r]+@[^\s\n\r]+)/i);
+    if (borrEmailM && !borrEmailM[1].includes('ridgewoodbank') && !borrEmailM[1].includes('rhappraisal')) {
+      trySet('f-email', borrEmailM[1].trim());
+    }
+
+    // ── Inspection contact (Appt. Contact line or borrower) ──────────────
+    const apptM = text.match(/Appt\.\s*Contact:\s+([^\n\r]+)/i);
+    if (apptM && apptM[1].trim()) {
+      trySet('f-insp-contact', apptM[1].trim());
+    } else if (borrowerM) {
+      trySet('f-insp-contact', borrowerM[1].trim());
+    }
+    if (ph) trySet('f-insp-contact-phone', ph[1].trim());
+
+    // ── AMC = Mercury VMP / Client company ───────────────────────────────
+    const clientCoM = text.match(/Company\s+(Ridgewood[^\n\r]+|[^\n\r]+Bank[^\n\r]*)/i);
+    // Mercury VMP is the platform; lender is the actual client — leave AMC blank
+    // unless there's a separate AMC listed
+
+    // ── Prop type ────────────────────────────────────────────────────────
+    const propTypeM = text.match(/Prop\s+Type\s+([^\n\r]+)/i);
+    if (propTypeM) {
+      const pt = propTypeM[1].trim();
+      if (/detached|sfr|single/i.test(pt))     trySet('f-proptype', 'SFR');
+      else if (/condo/i.test(pt))               trySet('f-proptype', 'Condo');
+      else if (/2[-\s]?family|duplex/i.test(pt)) trySet('f-proptype', '2 Family');
+      else if (/3[-\s]?family/i.test(pt))       trySet('f-proptype', '3 Family');
     }
 
     return filled;
