@@ -4496,12 +4496,13 @@ function saveOrder() {
         address: data.lenderStreet||'', city: data.lenderCity||'', state: data.lenderState||'', zip: data.lenderZip||'', notes:'' };
       lenders.push(newCo); _sbUpsertLender(newCo);
     } else {
+      // Always update address fields when the order has them — keeps lender record current
       const rec = lenders[li]; let changed = false;
-      if (data.lenderStreet && !rec.address) { rec.address = data.lenderStreet; changed = true; }
-      if (data.lenderCity   && !rec.city)    { rec.city    = data.lenderCity;   changed = true; }
-      if (data.lenderState  && !rec.state)   { rec.state   = data.lenderState;  changed = true; }
-      if (data.lenderZip    && !rec.zip)     { rec.zip     = data.lenderZip;    changed = true; }
-      if (data.lenderPhone  && !rec.phone)   { rec.phone   = data.lenderPhone;  changed = true; }
+      if (data.lenderStreet && rec.address !== data.lenderStreet) { rec.address = data.lenderStreet; changed = true; }
+      if (data.lenderCity   && rec.city    !== data.lenderCity)   { rec.city    = data.lenderCity;   changed = true; }
+      if (data.lenderState  && rec.state   !== data.lenderState)  { rec.state   = data.lenderState;  changed = true; }
+      if (data.lenderZip    && rec.zip     !== data.lenderZip)    { rec.zip     = data.lenderZip;    changed = true; }
+      if (data.lenderPhone  && rec.phone   !== data.lenderPhone)  { rec.phone   = data.lenderPhone;  changed = true; }
       if (changed) _sbUpsertLender(rec);
     }
   }
@@ -4547,6 +4548,22 @@ function acInput(type) {
   if (val && !exact) {
     html += `<div class="ac-add" onmousedown="acAddNew('${type}','${esc(input.value.trim())}')">
       + Save "${esc(input.value.trim())}" as new ${type === 'lender' ? 'Lender' : 'AMC'}</div>`;
+  }
+
+  // If what the user typed exactly matches a lender record, auto-fill address fields
+  if (type === 'lender' && exact) {
+    const streetEl = document.getElementById('f-lender-street');
+    const cityEl   = document.getElementById('f-lender-city');
+    const stateEl  = document.getElementById('f-lender-state');
+    const zipEl    = document.getElementById('f-lender-zip');
+    const phoneEl  = document.getElementById('f-lender-phone');
+    if (exact.address || exact.city || exact.state || exact.zip) {
+      if (streetEl) streetEl.value = exact.address || '';
+      if (cityEl)   cityEl.value   = exact.city    || '';
+      if (stateEl)  stateEl.value  = exact.state   || '';
+      if (zipEl)    zipEl.value    = exact.zip      || '';
+    }
+    if (phoneEl && exact.phone && !phoneEl.value) phoneEl.value = exact.phone;
   }
 
   list.innerHTML = html;
@@ -4638,14 +4655,14 @@ function autoSaveExtractedCompany(type) {
     else                   { amcs.push(newCo);    _sbUpsertAmc(newCo); }
     toast(`✚ "${name}" added to ${type === 'lender' ? 'Lenders' : 'AMCs'}`);
   } else {
-    // Existing record — fill in address/phone if currently blank
+    // Existing record — always update address/phone when the order has values
     const rec     = db[idx];
     let   changed = false;
-    if (lStreet && !rec.address) { rec.address = lStreet; changed = true; }
-    if (lCity   && !rec.city)    { rec.city    = lCity;   changed = true; }
-    if (lState  && !rec.state)   { rec.state   = lState;  changed = true; }
-    if (lZip    && !rec.zip)     { rec.zip     = lZip;    changed = true; }
-    if (phone   && !rec.phone)   { rec.phone   = phone;   changed = true; }
+    if (lStreet && rec.address !== lStreet) { rec.address = lStreet; changed = true; }
+    if (lCity   && rec.city    !== lCity)   { rec.city    = lCity;   changed = true; }
+    if (lState  && rec.state   !== lState)  { rec.state   = lState;  changed = true; }
+    if (lZip    && rec.zip     !== lZip)    { rec.zip     = lZip;    changed = true; }
+    if (phone   && rec.phone   !== phone)   { rec.phone   = phone;   changed = true; }
     if (changed) {
       if (type === 'lender') _sbUpsertLender(rec);
       else                   _sbUpsertAmc(rec);
