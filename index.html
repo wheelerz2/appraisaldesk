@@ -1188,6 +1188,42 @@ body.is-admin .admin-only { display: block !important; }
 }
 .income-filters .spacer { flex: 1; }
 .income-export-btns { display: flex; gap: 8px; }
+.income-sort-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 14px;
+}
+.income-sort-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 4px;
+}
+.inc-sort-btn {
+  padding: 5px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--cream);
+  color: var(--steel);
+  cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.inc-sort-btn:hover { background: var(--border); border-color: var(--accent); color: var(--accent); }
+.inc-sort-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.income-period-header td {
+  background: var(--card);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--accent);
+  padding: 10px 10px 6px;
+  border-bottom: 1px solid var(--border);
+}
 .btn-export {
   padding: 7px 14px;
   border: 1px solid var(--border);
@@ -1845,6 +1881,12 @@ body.is-admin .admin-only { display: block !important; }
           <button class="btn-export" onclick="window.print()">&#128424; Print / PDF</button>
         </div>
       </div>
+      <div class="income-sort-bar">
+        <span class="income-sort-label">Group by:</span>
+        <button id="inc-sort-year"    class="inc-sort-btn active" onclick="setIncomeSort('year')">Year</button>
+        <button id="inc-sort-quarter" class="inc-sort-btn"        onclick="setIncomeSort('quarter')">Quarter</button>
+        <button id="inc-sort-month"   class="inc-sort-btn"        onclick="setIncomeSort('month')">Month</button>
+      </div>
       <div class="income-summary-grid" id="income-tiles"></div>
       <div class="income-table-wrap">
         <table class="income-table">
@@ -1957,7 +1999,7 @@ body.is-admin .admin-only { display: block !important; }
         <table class="income-table acct-invoice-table">
           <thead>
             <tr>
-              <th>Due Date</th>
+              <th>Submitted</th>
               <th>Address</th>
               <th>Appraiser</th>
               <th>Lender / AMC</th>
@@ -7428,6 +7470,38 @@ function applyAppraiserSplit(appraiserId) {
 // ══════════════════════════════════════════
 // INCOME PAGE
 // ══════════════════════════════════════════
+let _incSortMode = 'year';
+function setIncomeSort(mode) {
+  _incSortMode = mode;
+  ['year','quarter','month'].forEach(m => {
+    const btn = document.getElementById('inc-sort-' + m);
+    if (btn) btn.classList.toggle('active', m === mode);
+  });
+  renderIncome();
+}
+
+function _incomePeriodKey(o, mode) {
+  const dt = o.due || o.orderSent || o.created || '';
+  if (!dt) return 'Unknown';
+  const d = new Date(dt + 'T00:00:00');
+  const yr = d.getFullYear();
+  if (mode === 'year')    return String(yr);
+  if (mode === 'quarter') {
+    const q = Math.floor(d.getMonth() / 3) + 1;
+    return `${yr} Q${q}`;
+  }
+  // month
+  return dt.slice(0, 7); // "YYYY-MM"
+}
+
+function _incomePeriodLabel(key, mode) {
+  if (mode === 'year' || mode === 'quarter' || key === 'Unknown') return key;
+  // "YYYY-MM" → "Month YYYY"
+  const [yr, mo] = key.split('-');
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return `${months[parseInt(mo, 10) - 1]} ${yr}`;
+}
+
 function renderIncome() {
   // Populate appraiser select
   const apSel = document.getElementById('inc-appraiser');
@@ -7441,6 +7515,7 @@ function renderIncome() {
   const selAp  = document.getElementById('inc-appraiser')?.value || 'all';
   const fromDt = document.getElementById('inc-from')?.value || '';
   const toDt   = document.getElementById('inc-to')?.value   || '';
+  const sortMode = _incSortMode || 'year';
 
   // Filter orders: must have a fee, and be complete (or any status — include all for income log)
   let list = orders.filter(o => {
@@ -7502,46 +7577,82 @@ function renderIncome() {
     return;
   }
 
-  // Group by appraiser
-  const grouped = {};
+  // Group by period (year / quarter / month)
+  const periodMap = {};
+  const periodOrder = [];
   list.forEach(o => {
-    const apId = o.appraiserId || '__none__';
-    if (!grouped[apId]) grouped[apId] = [];
-    grouped[apId].push(o);
+    const key = _incomePeriodKey(o, sortMode);
+    if (!periodMap[key]) { periodMap[key] = []; periodOrder.push(key); }
+    periodMap[key].push(o);
   });
+  // Keep chronological order (already sorted above); dedupe
+  const seenKeys = new Set();
+  const sortedPeriods = periodOrder.filter(k => { if (seenKeys.has(k)) return false; seenKeys.add(k); return true; });
 
   let html = '';
-  const apOrder = appraisers.map(a => a.id).filter(id => grouped[id]);
-  if (grouped['__none__']) apOrder.push('__none__');
+  sortedPeriods.forEach(periodKey => {
+    const periodRows = periodMap[periodKey];
+    const periodLabel = _incomePeriodLabel(periodKey, sortMode);
 
-  apOrder.forEach(apId => {
-    const apRows = grouped[apId];
-    const apLabel = apId === '__none__' ? 'Unassigned' : apName(apId);
-    const apSum = apTotals[apId];
+    // Period totals
+    let pFee = 0, pEarn = 0;
+    periodRows.forEach(o => {
+      pFee  += o.fee;
+      pEarn += Math.round(o.fee * ((o.feeSplit != null ? o.feeSplit : 100) / 100));
+    });
 
-    html += `<tr class="section-header"><td colspan="8">${esc(apLabel)} — ${apSum.count} order${apSum.count!==1?'s':''}</td></tr>`;
+    html += `<tr class="income-period-header"><td colspan="8">${esc(periodLabel)} — ${periodRows.length} order${periodRows.length!==1?'s':''}</td></tr>`;
 
-    apRows.forEach(o => {
-      const split = o.feeSplit != null ? o.feeSplit : 100;
-      const earn  = Math.round(o.fee * split / 100);
-      const party = o.amc || o.lender || '—';
-      html += `<tr onclick="openDetail('${o.id}')" style="cursor:pointer">
-        <td>${fmt(o.due)}</td>
-        <td>${esc(o.address.split(',')[0])}</td>
-        <td>${esc(o.client||'—')}</td>
-        <td>${esc(party)}</td>
-        <td>${esc(apLabel)}</td>
-        <td class="num">$${o.fee.toLocaleString()}</td>
-        <td class="num">${split}%</td>
-        <td class="num">$${earn.toLocaleString()}</td>
+    // Within each period, group by appraiser
+    const apGrouped = {};
+    periodRows.forEach(o => {
+      const apId = o.appraiserId || '__none__';
+      if (!apGrouped[apId]) apGrouped[apId] = [];
+      apGrouped[apId].push(o);
+    });
+    const apIds = appraisers.map(a => a.id).filter(id => apGrouped[id]);
+    if (apGrouped['__none__']) apIds.push('__none__');
+
+    apIds.forEach(apId => {
+      const apRows = apGrouped[apId];
+      const apLabel = apId === '__none__' ? 'Unassigned' : apName(apId);
+      let apFee = 0, apEarn = 0;
+      apRows.forEach(o => {
+        apFee  += o.fee;
+        apEarn += Math.round(o.fee * ((o.feeSplit != null ? o.feeSplit : 100) / 100));
+      });
+
+      html += `<tr class="section-header"><td colspan="8">${esc(apLabel)} — ${apRows.length} order${apRows.length!==1?'s':''}</td></tr>`;
+
+      apRows.forEach(o => {
+        const split = o.feeSplit != null ? o.feeSplit : 100;
+        const earn  = Math.round(o.fee * split / 100);
+        const party = o.amc || o.lender || '—';
+        html += `<tr onclick="openDetail('${o.id}')" style="cursor:pointer">
+          <td>${fmt(o.due)}</td>
+          <td>${esc(o.address.split(',')[0])}</td>
+          <td>${esc(o.client||'—')}</td>
+          <td>${esc(party)}</td>
+          <td>${esc(apLabel)}</td>
+          <td class="num">$${o.fee.toLocaleString()}</td>
+          <td class="num">${split}%</td>
+          <td class="num">$${earn.toLocaleString()}</td>
+        </tr>`;
+      });
+
+      html += `<tr class="total-row">
+        <td colspan="5" style="text-align:right;font-size:12px">Subtotal — ${esc(apLabel)}</td>
+        <td class="num">$${apFee.toLocaleString()}</td>
+        <td class="num"></td>
+        <td class="num">$${apEarn.toLocaleString()}</td>
       </tr>`;
     });
 
-    html += `<tr class="total-row">
-      <td colspan="5" style="text-align:right;font-size:12px">Subtotal — ${esc(apLabel)}</td>
-      <td class="num">$${apSum.fee.toLocaleString()}</td>
+    html += `<tr class="total-row" style="border-top:2px solid var(--border)">
+      <td colspan="5" style="text-align:right;font-size:12px;font-weight:700">${esc(periodLabel)} Total</td>
+      <td class="num" style="font-weight:700">$${pFee.toLocaleString()}</td>
       <td class="num"></td>
-      <td class="num">$${apSum.earn.toLocaleString()}</td>
+      <td class="num" style="font-weight:700">$${pEarn.toLocaleString()}</td>
     </tr>`;
   });
 
@@ -7805,7 +7916,7 @@ function renderAppraisalPayments() {
     if (apPayFilter === 'unpaid') return !o.appraiserPaid;
     if (apPayFilter === 'paid')   return !!o.appraiserPaid;
     return true;
-  }).sort((a,b) => (b.due||b.created||'').localeCompare(a.due||a.created||''));
+  }).sort((a,b) => (b.orderSent||b.due||b.created||'').localeCompare(a.orderSent||a.due||a.created||''));
 
   // Summary tiles
   const allForAp = apOrders.filter(o => sel.value === 'all' || o.appraiserId === sel.value);
@@ -7831,7 +7942,7 @@ function renderAppraisalPayments() {
     const earn = Math.round(o.fee * ((o.feeSplit!=null?o.feeSplit:100)/100));
     const isPaid = !!o.appraiserPaid;
     return `<tr>
-      <td>${fmt(o.due)}</td>
+      <td>${o.orderSent ? fmt(o.orderSent) : (o.due ? fmt(o.due) : '—')}</td>
       <td style="cursor:pointer;color:var(--accent)" onclick="showPage('orders');setTimeout(()=>openDetail('${o.id}'),80)">${esc(o.address||'—')}</td>
       <td>${esc(apName(o.appraiserId))}</td>
       <td>${esc(o.amc||o.lender||'—')}</td>
@@ -7993,7 +8104,7 @@ function printAppraisalPayments() {
     if (apPayFilter === 'unpaid') return !o.appraiserPaid;
     if (apPayFilter === 'paid')   return !!o.appraiserPaid;
     return true;
-  }).sort((a,b) => (b.due||b.created||'').localeCompare(a.due||a.created||''));
+  }).sort((a,b) => (b.orderSent||b.due||b.created||'').localeCompare(a.orderSent||a.due||a.created||''));
 
   const allForAp = apOrders.filter(o => sel.value === 'all' || o.appraiserId === sel.value);
   const totalEarn   = allForAp.reduce((s,o) => s + Math.round(o.fee * ((o.feeSplit!=null?o.feeSplit:100)/100)), 0);
@@ -8011,7 +8122,7 @@ function printAppraisalPayments() {
     const earn = Math.round(o.fee * ((o.feeSplit!=null?o.feeSplit:100)/100));
     const isPaid = !!o.appraiserPaid;
     return `<tr>
-      <td>${fmt(o.due)||'—'}</td>
+      <td>${o.orderSent ? fmt(o.orderSent) : (o.due ? fmt(o.due) : '—')}</td>
       <td>${esc(o.address||'—')}</td>
       <td>${esc(apName(o.appraiserId))}</td>
       <td>${esc(o.amc||o.lender||'—')}</td>
@@ -8023,7 +8134,7 @@ function printAppraisalPayments() {
   }).join('');
 
   const tableHtml = `<table>
-    <thead><tr><th>Due Date</th><th>Address</th><th>Appraiser</th><th>Lender / AMC</th><th class="num">Total Fee</th><th class="num">Appraiser Earns</th><th style="text-align:center">Status</th><th>Paid Date</th></tr></thead>
+    <thead><tr><th>Submitted</th><th>Address</th><th>Appraiser</th><th>Lender / AMC</th><th class="num">Total Fee</th><th class="num">Appraiser Earns</th><th style="text-align:center">Status</th><th>Paid Date</th></tr></thead>
     <tbody>${rowsHtml || '<tr><td colspan="8" style="text-align:center;color:#999;padding:20px">No records</td></tr>'}</tbody>
     <tfoot><tr><td colspan="4">Showing ${rows.length} of ${allForAp.length} records</td><td></td><td class="num">$${filteredEarn.toFixed(2)}</td><td colspan="2"></td></tr></tfoot>
   </table>`;
