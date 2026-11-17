@@ -4264,7 +4264,16 @@ function _autoSaveNow() {
     fee:          parseFloat(document.getElementById('f-fee').value) || 0,
     feeSplit:     parseInt(document.getElementById('f-feesplit').value) || 100,
     orderDate:    document.getElementById('f-order-date').value,
-    orderSent:    document.getElementById('f-order-sent').value,
+    orderSent:    (function(){
+      const val = document.getElementById('f-order-sent').value;
+      const st  = document.getElementById('f-status').value;
+      if (st === 'complete' && !val) {
+        const today = new Date().toISOString().slice(0,10);
+        document.getElementById('f-order-sent').value = today;
+        return today;
+      }
+      return val;
+    })(),
     due:          document.getElementById('f-due').value,
     inspection:       document.getElementById('f-inspection').value,
     inspectionTime:   document.getElementById('f-inspection-time').value,
@@ -4405,7 +4414,16 @@ function saveOrder() {
     fee:         parseFloat(document.getElementById('f-fee').value) || 0,
     feeSplit:    parseInt(document.getElementById('f-feesplit').value) || 100,
     orderDate:      document.getElementById('f-order-date').value,
-    orderSent:      document.getElementById('f-order-sent').value,
+    orderSent:      (function(){
+      const val = document.getElementById('f-order-sent').value;
+      const st  = document.getElementById('f-status').value;
+      if (st === 'complete' && !val) {
+        const today = new Date().toISOString().slice(0,10);
+        document.getElementById('f-order-sent').value = today;
+        return today;
+      }
+      return val;
+    })(),
     due:            document.getElementById('f-due').value,
     inspection:         document.getElementById('f-inspection').value,
     inspectionTime:     document.getElementById('f-inspection-time').value,
