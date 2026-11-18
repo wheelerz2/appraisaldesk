@@ -6064,6 +6064,7 @@ function extractOrderData(raw) {
   // ── Detect format ────────────────────────────────────────────────────────
   const isAppraisalPort = /appraisalport\.com/i.test(text) || (/Engagement Letter/i.test(text) && !/allproamc\.com/i.test(text));
   const isVLConnect     = /connectvl\.com|VL Connect/i.test(text);
+  // isNVPN is declared inline below before its parser block
 
   // ════════════════════════════════════════════════════════════════════════
   // APPRAISALPORT FORMAT (TD Bank engagement letters)
@@ -7048,6 +7049,165 @@ function extractOrderData(raw) {
       else if (/condo/i.test(pt))               trySet('f-proptype', 'Condo');
       else if (/2[-\s]?family|duplex/i.test(pt)) trySet('f-proptype', '2 Family');
       else if (/3[-\s]?family/i.test(pt))       trySet('f-proptype', '3 Family');
+    }
+
+    return filled;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  // NVPN MANAGEMENT SERVICES FORMAT
+  // Identified by "NVPN Management Services" header / footer in text.
+  // Layout: "Field:\t Value" pairs in a consistent labeled table.
+  // ════════════════════════════════════════════════════════════════════════
+  const isNVPN = /NVPN\s+Management\s+Services/i.test(text);
+  if (isNVPN) {
+    // Helper: extract labeled value from the NVPN table
+    // Matches "Label:  value" whether on one line or split across lines
+    function nvpnField(label) {
+      const re = new RegExp(label + '\\s*:\\s*([^\\n\\r]{1,120})', 'i');
+      const m = text.match(re);
+      return m ? m[1].trim() : '';
+    }
+
+    // ── Subject property address ──────────────────────────────────────────
+    // "Property Address:  110 Livingston Street 7 P Brooklyn NY 11201"
+    const nvAddr = nvpnField('Property\\s+Address');
+    if (nvAddr) setAddressFields(nvAddr);
+
+    // ── Borrower ──────────────────────────────────────────────────────────
+    // "Borrower Name:  Peter Dowdeswell and Gia Dowdeswell"
+    const nvBorr = nvpnField('Borrower\\s+Name');
+    if (nvBorr) {
+      const parts = nvBorr.split(/\s+and\s+/i).map(s => s.trim()).filter(Boolean);
+      setBorrowerFields(parts.length ? parts : [nvBorr]);
+    }
+
+    // ── Phone — prefer Cell, then Phone, skip AMC/NVPN numbers ───────────
+    const nvCell  = nvpnField('Cell\\s+Phone');
+    const nvPhone = nvpnField('Phone');
+    for (const ph of [nvCell, nvPhone]) {
+      if (!ph) continue;
+      const digits = ph.replace(/\D/g, '');
+      if (digits.length >= 10 && !/^7142171219/.test(digits)) { trySet('f-phone', ph); break; }
+    }
+
+    // ── Email — first borrower email, skip NVPN addresses ─────────────────
+    // "Borrower Email:  peter@roscilamb.com; gia.dowdeswell@gmail.com"
+    const nvEmailLine = nvpnField('Borrower\\s+Email');
+    if (nvEmailLine) {
+      const addrs = nvEmailLine.split(/[;,\s]+/).filter(e => /\@/.test(e));
+      for (const a of addrs) {
+        if (!/nvpn|nvpservice/i.test(a)) { trySet('f-email', a.trim()); break; }
+      }
+    }
+    if (!document.getElementById('f-email')?.value) {
+      // Fall back to any email in the doc, skipping NVPN addresses
+      const allEmails = [...text.matchAll(/\b([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\b/g)];
+      for (const em of allEmails) {
+        if (!/nvpn|nvpservice/i.test(em[1])) { trySet('f-email', em[1]); break; }
+      }
+    }
+
+    // ── Lender (Client field) ─────────────────────────────────────────────
+    // "Client:  Luminate Bank"  "Client Address:  2523 S Wayzata Blvd Ste.#100,, Minneapolis MN 55405"
+    const nvClient = nvpnField('Client');
+    if (nvClient && !/address/i.test(nvClient)) {
+      trySet('f-lender', nvClient);
+      // Look up in DB first
+      const normalize = s => s.toLowerCase().replace(/[^a-z0-9]/g,'');
+      const nvNorm = normalize(nvClient);
+      const dbMatch = [...(lenders||[])].find(c => normalize(c.name||'') === nvNorm);
+      if (dbMatch) {
+        if (dbMatch.address) trySet('f-lender-street', dbMatch.address);
+        if (dbMatch.city)    trySet('f-lender-city',   dbMatch.city);
+        if (dbMatch.state)   trySet('f-lender-state',  dbMatch.state);
+        if (dbMatch.zip)     trySet('f-lender-zip',    dbMatch.zip);
+        if (dbMatch.phone)   trySet('f-lender-phone',  dbMatch.phone);
+      } else {
+        // Extract from "Client Address:" field
+        const nvCAddr = nvpnField('Client\\s+Address');
+        if (nvCAddr) {
+          // May be "2523 S Wayzata Blvd\n                                                                                                 Ste.#100,, Minneapolis\n                                                                                                 MN 55405"
+          // Collapse extra whitespace and newlines
+          const flatAddr = nvCAddr.replace(/\s+/g, ' ').trim();
+          // Split into street / city+state+zip
+          const caM = flatAddr.match(/^(.*?),?\s*([A-Za-z][A-Za-z\s]+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+          if (caM) {
+            trySet('f-lender-street', caM[1].trim().replace(/,+$/, '').trim());
+            trySet('f-lender-city',  caM[2].trim());
+            trySet('f-lender-state', caM[3].trim());
+            trySet('f-lender-zip',   caM[4].trim());
+          } else {
+            // Try the multi-line version: grab first 3 lines after "Client Address:"
+            const caBlock = text.match(/Client\s+Address\s*:\s*([^\n\r]{1,80})[\r\n\s]+([^\n\r]{1,80})[\r\n\s]+([^\n\r]{1,80})/i);
+            if (caBlock) {
+              const street = caBlock[1].trim();
+              const mid    = caBlock[2].trim(); // e.g. "Ste.#100,, Minneapolis"
+              const last   = caBlock[3].trim(); // e.g. "MN 55405"
+              const szM = last.match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+              if (szM) {
+                // city is last word(s) of mid before any trailing comma
+                const cityM = mid.replace(/,+\s*$/, '').match(/(?:,\s*|^)([A-Za-z][A-Za-z\s]+)$/);
+                const suitePart = mid.replace(/,+\s*$/, '').replace(cityM ? cityM[0] : '', '').trim().replace(/,+$/, '').trim();
+                trySet('f-lender-street', (street + (suitePart ? ', ' + suitePart : '')).trim());
+                trySet('f-lender-city',  cityM ? cityM[1].trim() : '');
+                trySet('f-lender-state', szM[1]);
+                trySet('f-lender-zip',   szM[2]);
+              } else {
+                trySet('f-lender-street', street);
+              }
+            } else {
+              trySet('f-lender-street', flatAddr);
+            }
+          }
+        }
+      }
+    }
+
+    // ── AMC = NVPN ────────────────────────────────────────────────────────
+    trySet('f-amc', 'NVPN Management Services LLC');
+
+    // ── Fee: "Total Vendor's Fee:  575.00" or "Net Vendor's Fee:" ─────────
+    const nvFee = nvpnField("Total\\s+Vendor[`']?s\\s+Fee") || nvpnField("Net\\s+Vendor[`']?s\\s+Fee") || nvpnField("Vendor[`']?s\\s+Fee");
+    if (nvFee) { const feeNum = nvFee.replace(/[^0-9.]/g,''); if (feeNum) trySet('f-fee', feeNum); }
+
+    // ── Due date: "Order Due Date:  11/20/2026" ───────────────────────────
+    const nvDue = nvpnField('Order\\s+Due\\s+Date');
+    if (nvDue) {
+      const dM = nvDue.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+      if (dM) trySet('f-due', normalizeDate(dM[1]));
+    }
+
+    // ── Loan number ───────────────────────────────────────────────────────
+    const nvLoan = nvpnField('Loan\\s+Number');
+    if (nvLoan) trySet('f-loan', nvLoan);
+
+    // ── Transaction type → purpose ────────────────────────────────────────
+    const nvTxn = nvpnField('Transaction\\s+Type');
+    if (nvTxn) trySet('f-purpose', normalizePurpose(nvTxn));
+
+    // ── Property type ─────────────────────────────────────────────────────
+    const nvPropType = nvpnField('Property\\s+Type');
+    if (nvPropType) {
+      if (/condo/i.test(nvPropType))         trySet('f-proptype', 'Condo');
+      else if (/2.?family/i.test(nvPropType)) trySet('f-proptype', '2 Family');
+      else if (/3.?family/i.test(nvPropType)) trySet('f-proptype', '3 Family');
+      else if (/single|sfr|1.?fam/i.test(nvPropType)) trySet('f-proptype', '1 Family');
+    }
+
+    // ── Form type from Product field ─────────────────────────────────────
+    // "Product:  (UAD 3.6) Jumbo Condo, 1007 Rent Schedule"
+    const nvProduct = nvpnField('Product');
+    if (nvProduct) {
+      const fType = detectFormType(nvProduct) || detectFormType(text);
+      if (fType) trySet('f-type', fType);
+    }
+
+    // ── Order number → notes ──────────────────────────────────────────────
+    const nvOrderNum = nvpnField('Order\\s+Number');
+    if (nvOrderNum) {
+      const notesEl = document.getElementById('f-notes');
+      if (notesEl && !notesEl.value) notesEl.value = 'Order #: ' + nvOrderNum;
     }
 
     return filled;
