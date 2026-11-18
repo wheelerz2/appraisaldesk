@@ -6043,12 +6043,20 @@ function extractOrderData(raw) {
       const streetSuffix = parts[0].match(/^(.*?\b(?:Avenue|Ave|Street|St|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Way|Place|Pl|Parkway|Pkwy|Terrace|Ter|Terr|Highway|Hwy)\b\.?)\s*(.*)$/i);
       if (streetSuffix) {
         const maybeStreet = streetSuffix[1].trim();
-        const maybeCity = streetSuffix[2].trim();
-        // Check for unit in maybeStreet tail
+        const maybeRemainder = streetSuffix[2].trim();
+        // Check for unit keyword in street tail
         const unitM3 = maybeStreet.match(/\s+((?:Apt|Unit|#|Suite|Ste|Floor|Fl)\.?\s*[A-Za-z0-9\-]+)\s*$/i);
         if (unitM3) { unit = unitM3[1].trim(); street = maybeStreet.slice(0, unitM3.index).trim(); }
         else { street = maybeStreet; }
-        city = maybeCity;
+        // Check if remainder starts with a unit number (e.g. "7 P Brooklyn" or "4F Queens")
+        // Pattern: digit(s) optionally followed by space+letter, then a city name
+        const unitCityM = maybeRemainder.match(/^(\d+\s*[A-Za-z]?)\s+([A-Za-z].*)$/);
+        if (unitCityM && !unit) {
+          unit = unitCityM[1].trim().replace(/\s+/g,''); // normalize "7 P" → "7P"
+          city = unitCityM[2].trim();
+        } else {
+          city = maybeRemainder;
+        }
       } else {
         street = parts[0];
       }
@@ -7061,12 +7069,14 @@ function extractOrderData(raw) {
   // ════════════════════════════════════════════════════════════════════════
   const isNVPN = /NVPN\s+Management\s+Services/i.test(text);
   if (isNVPN) {
-    // Helper: extract labeled value from the NVPN table
-    // Matches "Label:  value" whether on one line or split across lines
+    // Helper: extract labeled value from the NVPN table.
+    // Trims right-column content (separated by 3+ spaces) from two-column layout lines.
     function nvpnField(label) {
       const re = new RegExp(label + '\\s*:\\s*([^\\n\\r]{1,120})', 'i');
       const m = text.match(re);
-      return m ? m[1].trim() : '';
+      if (!m) return '';
+      // Strip anything after 3+ consecutive spaces (right column in two-column layout)
+      return m[1].replace(/\s{3,}.*$/, '').trim();
     }
 
     // ── Subject property address ──────────────────────────────────────────
@@ -7109,7 +7119,8 @@ function extractOrderData(raw) {
     }
 
     // ── Lender (Client field) ─────────────────────────────────────────────
-    // "Client:  Luminate Bank"  "Client Address:  2523 S Wayzata Blvd Ste.#100,, Minneapolis MN 55405"
+    // Two-column layout: "Client:  Luminate Bank   Client Address:  2523 S Wayzata Blvd"
+    // nvpnField trims right-column junk, so Client → "Luminate Bank" cleanly.
     const nvClient = nvpnField('Client');
     if (nvClient && !/address/i.test(nvClient)) {
       trySet('f-lender', nvClient);
@@ -7124,41 +7135,49 @@ function extractOrderData(raw) {
         if (dbMatch.zip)     trySet('f-lender-zip',    dbMatch.zip);
         if (dbMatch.phone)   trySet('f-lender-phone',  dbMatch.phone);
       } else {
-        // Extract from "Client Address:" field
-        const nvCAddr = nvpnField('Client\\s+Address');
-        if (nvCAddr) {
-          // May be "2523 S Wayzata Blvd\n                                                                                                 Ste.#100,, Minneapolis\n                                                                                                 MN 55405"
-          // Collapse extra whitespace and newlines
-          const flatAddr = nvCAddr.replace(/\s+/g, ' ').trim();
-          // Split into street / city+state+zip
-          const caM = flatAddr.match(/^(.*?),?\s*([A-Za-z][A-Za-z\s]+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
-          if (caM) {
-            trySet('f-lender-street', caM[1].trim().replace(/,+$/, '').trim());
-            trySet('f-lender-city',  caM[2].trim());
-            trySet('f-lender-state', caM[3].trim());
-            trySet('f-lender-zip',   caM[4].trim());
-          } else {
-            // Try the multi-line version: grab first 3 lines after "Client Address:"
-            const caBlock = text.match(/Client\s+Address\s*:\s*([^\n\r]{1,80})[\r\n\s]+([^\n\r]{1,80})[\r\n\s]+([^\n\r]{1,80})/i);
-            if (caBlock) {
-              const street = caBlock[1].trim();
-              const mid    = caBlock[2].trim(); // e.g. "Ste.#100,, Minneapolis"
-              const last   = caBlock[3].trim(); // e.g. "MN 55405"
-              const szM = last.match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
-              if (szM) {
-                // city is last word(s) of mid before any trailing comma
-                const cityM = mid.replace(/,+\s*$/, '').match(/(?:,\s*|^)([A-Za-z][A-Za-z\s]+)$/);
-                const suitePart = mid.replace(/,+\s*$/, '').replace(cityM ? cityM[0] : '', '').trim().replace(/,+$/, '').trim();
-                trySet('f-lender-street', (street + (suitePart ? ', ' + suitePart : '')).trim());
-                trySet('f-lender-city',  cityM ? cityM[1].trim() : '');
-                trySet('f-lender-state', szM[1]);
-                trySet('f-lender-zip',   szM[2]);
-              } else {
-                trySet('f-lender-street', street);
-              }
+        // Client Address is in the right column; grab it plus its continuation lines
+        // (continuation lines are indented by 30+ spaces)
+        const caM = text.match(/Client\s+Address:\s+([\S][^\n\r]{0,80})((?:\n[ \t]{30,}[^\n\r]+)*)/i);
+        if (caM) {
+          const contLines = caM[2].split('\n').map(l => l.trim()).filter(Boolean);
+          const addrParts = [caM[1].trim(), ...contLines];
+          if (addrParts.length >= 3) {
+            // addrParts[0] = street, [1] = "Ste.#100,, City", [2] = "ST ZIP"
+            const szM = addrParts[2].match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+            if (szM) {
+              const midClean = addrParts[1].replace(/,+\s*$/, '');
+              const cityM = midClean.match(/(?:,\s*|^)([A-Za-z][A-Za-z\s]+)$/);
+              const suitePart = midClean.replace(cityM ? cityM[0] : '', '').trim().replace(/,+$/, '').trim();
+              trySet('f-lender-street', (addrParts[0] + (suitePart ? ', ' + suitePart : '')).trim());
+              trySet('f-lender-city',  cityM ? cityM[1].trim() : '');
+              trySet('f-lender-state', szM[1]);
+              trySet('f-lender-zip',   szM[2]);
             } else {
-              trySet('f-lender-street', flatAddr);
+              // Fewer lines or different format — concatenate and parse
+              const flat = addrParts.join(', ').replace(/,{2,}/g, ',');
+              const fM = flat.match(/^(.*?),\s*([A-Za-z][A-Za-z\s]+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+              if (fM) {
+                trySet('f-lender-street', fM[1].trim());
+                trySet('f-lender-city',  fM[2].trim());
+                trySet('f-lender-state', fM[3].trim());
+                trySet('f-lender-zip',   fM[4].trim());
+              } else {
+                trySet('f-lender-street', addrParts[0]);
+              }
             }
+          } else if (addrParts.length === 2) {
+            // e.g. "123 Main St", "Minneapolis MN 55405"
+            const fM2 = addrParts[1].match(/^([A-Za-z][A-Za-z\s]+)\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+            if (fM2) {
+              trySet('f-lender-street', addrParts[0]);
+              trySet('f-lender-city',  fM2[1].trim());
+              trySet('f-lender-state', fM2[2]);
+              trySet('f-lender-zip',   fM2[3]);
+            } else {
+              trySet('f-lender-street', addrParts[0]);
+            }
+          } else {
+            trySet('f-lender-street', addrParts[0]);
           }
         }
       }
