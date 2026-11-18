@@ -7093,19 +7093,23 @@ function extractOrderData(raw) {
     }
 
     // ── Phone — prefer Cell, then Phone, skip AMC/NVPN numbers ───────────
-    const nvCell  = nvpnField('Cell\\s+Phone');
-    const nvPhone = nvpnField('Phone');
+    // Cell Phone may have multiple comma-separated numbers; take only the first
+    const nvCellRaw = nvpnField('Cell\\s+Phone');
+    const nvCell    = nvCellRaw ? nvCellRaw.split(/[,;]/)[0].trim() : '';
+    const nvPhone   = nvpnField('Phone');
     for (const ph of [nvCell, nvPhone]) {
       if (!ph) continue;
       const digits = ph.replace(/\D/g, '');
       if (digits.length >= 10 && !/^7142171219/.test(digits)) { trySet('f-phone', ph); break; }
     }
 
-    // ── Email — first borrower email, skip NVPN addresses ─────────────────
-    // "Borrower Email:  peter@roscilamb.com; gia.dowdeswell@gmail.com"
-    const nvEmailLine = nvpnField('Borrower\\s+Email');
-    if (nvEmailLine) {
-      const addrs = nvEmailLine.split(/[;,\s]+/).filter(e => /\@/.test(e));
+    // ── Email — first borrower email, capturing continuation lines too ────
+    // Borrower Email can span two lines: first on the same row, second indented 30+ chars
+    const nvEmailM = text.match(/Borrower\s+Email:\s+([\S][^\n\r]{0,120})((?:\n[ \t]{30,}[^\n\r]+)*)/i);
+    if (nvEmailM) {
+      const contEmailLines = nvEmailM[2].split('\n').map(l => l.trim()).filter(Boolean);
+      const allEmailText = nvEmailM[1] + ' ' + contEmailLines.join(' ');
+      const addrs = allEmailText.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g) || [];
       for (const a of addrs) {
         if (!/nvpn|nvpservice/i.test(a)) { trySet('f-email', a.trim()); break; }
       }
@@ -7199,7 +7203,7 @@ function extractOrderData(raw) {
 
     // ── Loan number ───────────────────────────────────────────────────────
     const nvLoan = nvpnField('Loan\\s+Number');
-    if (nvLoan) trySet('f-loan', nvLoan);
+    if (nvLoan && !/N\/A/i.test(nvLoan)) trySet('f-loannum', nvLoan);
 
     // ── Transaction type → purpose ────────────────────────────────────────
     const nvTxn = nvpnField('Transaction\\s+Type');
@@ -7222,11 +7226,20 @@ function extractOrderData(raw) {
       if (fType) trySet('f-type', fType);
     }
 
-    // ── Order number → notes ──────────────────────────────────────────────
+    // ── Order number → AMC order ID + notes ──────────────────────────────
     const nvOrderNum = nvpnField('Order\\s+Number');
     if (nvOrderNum) {
+      trySet('f-amcid', nvOrderNum);
       const notesEl = document.getElementById('f-notes');
       if (notesEl && !notesEl.value) notesEl.value = 'Order #: ' + nvOrderNum;
+    }
+
+    // ── Access Info → contact name / phone ────────────────────────────────
+    // "Access Info:  Name:Peter Dowdeswell | MOBILE: 6464799965 | EMAIL: peter@roscilamb.com"
+    const accessM = text.match(/Access\s+Info[:\s]+Name:([^|\n\r]+)\|[^|]*MOBILE:\s*(\d[\d\s\-\(\)]{7,15})\s*\|/i);
+    if (accessM) {
+      trySet('f-contact-name',  accessM[1].trim());
+      trySet('f-contact-phone', accessM[2].trim());
     }
 
     return filled;
