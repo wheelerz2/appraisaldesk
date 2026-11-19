@@ -3712,35 +3712,40 @@ function buildSidebarFilters() {
   apSel.innerHTML = '<option value="all">All Appraisers</option>' +
     appraisers.map(a => `<option value="${a.id}"${filters.appraiser===a.id?' selected':''}>${esc(a.name)}</option>`).join('');
 
-  // AMC filter buttons — sorted by order count descending
+  // Helper: count open (non-complete, non-cancelled) orders for a field value
+  const isOpen = o => !['complete','cancelled'].includes(o.status);
+  const openAmcCount  = n => myOrders.filter(o => isOpen(o) && (o.amc||'').toLowerCase()===n.toLowerCase()).length;
+  const openLendCount = n => myOrders.filter(o => isOpen(o) && (o.lender||'').toLowerCase()===n.toLowerCase()).length;
+
+  // AMC filter buttons — sorted by open order count descending
   const amcNames = [...new Set(myOrders.map(o => o.amc).filter(Boolean))]
-    .sort((a, b) => myOrders.filter(o=>(o.amc||'').toLowerCase()===b.toLowerCase()).length
-                  - myOrders.filter(o=>(o.amc||'').toLowerCase()===a.toLowerCase()).length);
+    .sort((a, b) => openAmcCount(b) - openAmcCount(a));
   const amcEl = document.getElementById('amc-filters');
   amcEl.innerHTML = `<button class="filter-btn${filters.amc==='all'?' active':''}" onclick="setAmcFilter('all')">
     <span class="filter-label">All AMCs</span></button>` +
     amcNames.map(n => {
       const active = filters.amc.toLowerCase() === n.toLowerCase() ? ' active' : '';
+      const openCnt = openAmcCount(n);
       return `<button class="filter-btn${active}" onclick="setAmcFilter('${esc(n)}')">
         <span class="filter-label">${esc(n)}</span>
-        <span class="filter-count">${myOrders.filter(o=>(o.amc||'').toLowerCase()===n.toLowerCase()).length}</span>
+        ${openCnt > 0 ? `<span class="filter-count">${openCnt}</span>` : ''}
       </button>`;
     }).join('') +
     `<button class="filter-btn${filters.amc==='__none__'?' active':''}" onclick="setAmcFilter('__none__')">
       <span class="filter-label" style="font-style:italic;color:var(--muted)">No AMC</span></button>`;
 
-  // Lender filter buttons — sorted by order count descending
+  // Lender filter buttons — sorted by open order count descending
   const lenderNames = [...new Set(myOrders.map(o => o.lender).filter(Boolean))]
-    .sort((a, b) => myOrders.filter(o=>(o.lender||'').toLowerCase()===b.toLowerCase()).length
-                  - myOrders.filter(o=>(o.lender||'').toLowerCase()===a.toLowerCase()).length);
+    .sort((a, b) => openLendCount(b) - openLendCount(a));
   const lenderEl = document.getElementById('lender-filters');
   lenderEl.innerHTML = `<button class="filter-btn${filters.lender==='all'?' active':''}" onclick="setLenderFilter('all')">
     <span class="filter-label">All Lenders</span></button>` +
     lenderNames.map(n => {
       const active = filters.lender.toLowerCase() === n.toLowerCase() ? ' active' : '';
+      const openCnt = openLendCount(n);
       return `<button class="filter-btn${active}" onclick="setLenderFilter('${esc(n)}')">
         <span class="filter-label">${esc(n)}</span>
-        <span class="filter-count">${myOrders.filter(o=>(o.lender||'').toLowerCase()===n.toLowerCase()).length}</span>
+        ${openCnt > 0 ? `<span class="filter-count">${openCnt}</span>` : ''}
       </button>`;
     }).join('') +
     `<button class="filter-btn${filters.lender==='__none__'?' active':''}" onclick="setLenderFilter('__none__')">
