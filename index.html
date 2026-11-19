@@ -3621,12 +3621,15 @@ function renderDashboard() {
     const ap      = apName(o.appraiserId);
     const timeStr = o.inspectionTime ? fmtTime12(o.inspectionTime) : '';
     const client  = o.lender || o.amc || '';
+    const pill    = STATUS_LABELS[o.status] || o.status || '';
+    const sc      = STATUS_COLOR[o.status] || '#6b7280';
     return `<div class="dash-row" onclick="openDetail('${esc(o.id)}')">
       <div class="dash-row-bar" style="background:${color}"></div>
       <div class="dash-row-inner">
         <div class="dash-row-addr" title="${esc(addr)}">${esc(addr)}</div>
         <div class="dash-row-meta">
           ${timeStr ? `<span class="dash-row-time">${esc(timeStr)}</span>` : ''}
+          <span class="dash-row-pill" style="background:color-mix(in srgb,${sc} 15%,transparent);color:${sc}">${esc(pill)}</span>
           <span class="dash-row-ap"><span class="dash-row-dot" style="background:${color}"></span>${esc(ap)}</span>
           ${client ? `<span>· ${esc(client)}</span>` : ''}
         </div>
@@ -4262,6 +4265,8 @@ function showInspectionPopup(orderId, onSave) {
     // Save to order object
     o.inspection     = d;
     o.inspectionTime = t || '';
+    // Auto-advance status when inspection is set
+    if (o.status === 'new') o.status = 'inspection';
     close();
     if (onSave) onSave();
   };
@@ -4763,6 +4768,12 @@ function saveOrder() {
     appraiserId: document.getElementById('f-appraiser').value,
     notes:       document.getElementById('f-notes').value.trim(),
   };
+
+  // Auto-advance: if inspection date is set and status is still 'new', bump to 'inspection'
+  if (data.inspection && data.status === 'new') {
+    data.status = 'inspection';
+    document.getElementById('f-status').value = 'inspection';
+  }
 
   let savedOrder;
   if (editingOrderId) {
