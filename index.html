@@ -1883,8 +1883,8 @@ body.is-admin .admin-only { display: block !important; }
     <div class="main-content" id="orders-content">
       <div id="orders-toolbar">
         <span id="orders-count"></span>
-        <button class="sort-btn active" id="sort-date" onclick="setSort('date')">Due Date</button>
-        <button class="sort-btn" id="sort-created" onclick="setSort('created')">Created</button>
+        <button class="sort-btn" id="sort-date" onclick="setSort('date')">Due Date</button>
+        <button class="sort-btn active" id="sort-created" onclick="setSort('created')">Created</button>
         <button class="sort-btn" id="sort-addr" onclick="setSort('addr')">Address</button>
       </div>
       <div id="orders-list"></div>
@@ -3445,7 +3445,7 @@ function seedData() {
 let filters = { status: '__open__', appraiser: 'all', type: 'all', amc: 'all', lender: 'all' };
 let calFilters = { appraiser: 'all', amc: 'all', lender: 'all' };
 let calShowDue = true;
-let sortMode = 'date';
+let sortMode = 'created';
 let searchQuery = '';
 let currentPage = 'orders';
 let detailOrderId = null;
@@ -3590,7 +3590,7 @@ function renderDashboard() {
 
   const todayInsp   = myOrders.filter(o => o.inspection === todayStr).sort(byTime);
   const tomorrowInsp= myOrders.filter(o => o.inspection === tomorrowStr).sort(byTime);
-  const unscheduled = myOrders.filter(o => isOpen(o) && !o.inspection);
+  const unscheduled = myOrders.filter(o => isOpen(o) && !o.inspection && o.status !== 'onhold');
   const openAll     = myOrders.filter(isOpen);
 
   // ── STAT TILES ────────────────────────────────────────────────────────────
