@@ -788,7 +788,8 @@ body.is-admin .admin-only { display: block !important; }
   transition: border-color .12s;
 }
 .day-ev-card:hover { border-color: var(--accent); }
-.day-ev-type { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 3px; }
+.day-ev-type { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 3px; display:flex; align-items:center; gap:6px; }
+.day-ev-time { font-size: 11px; font-weight: 700; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); padding: 1px 6px; border-radius: 4px; text-transform: none; letter-spacing: 0; }
 .day-ev-addr { font-weight: 600; font-size: 14px; }
 .day-ev-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .day-empty { text-align: center; padding: 24px 0; color: var(--muted); font-size: 14px; }
@@ -4924,16 +4925,27 @@ function renderCalendar() {
     const shown = visibleEvs.slice(0, max);
     const more  = visibleEvs.length - max;
 
+    // Sort inspection events by time, due events after
+    shown.sort((a, b) => {
+      if (a.type === 'insp' && b.type === 'insp') {
+        const ta = a.order.inspectionTime || '99:99';
+        const tb = b.order.inspectionTime || '99:99';
+        return ta < tb ? -1 : ta > tb ? 1 : 0;
+      }
+      if (a.type === 'insp') return -1;
+      if (b.type === 'insp') return 1;
+      return 0;
+    });
     let evHtml = shown.map(e => {
       const addr = e.order.address.split(',')[0];
       const color = apColor(e.order.appraiserId);
-      const initials = apInitials(e.order.appraiserId);
       // Due: solid background with DUE label; Inspection: slightly transparent with dashed border
       const style = e.type === 'due'
         ? `background:${color}`
         : `background:${color}99;outline:1px dashed ${color}`;
+      const timeStr = (e.type === 'insp' && e.order.inspectionTime) ? ' ' + fmtTime12(e.order.inspectionTime) : '';
       const prefix = e.type === 'due' ? 'DUE: ' : 'INSP: ';
-      return `<div class="cal-ev" style="${style}" title="${e.type==='due'?'Due Date: ':'Inspection: '}${esc(e.order.address)}">${prefix}${esc(addr)}</div>`;
+      return `<div class="cal-ev" style="${style}" title="${e.type==='due'?'Due Date: ':'Inspection: '}${esc(e.order.address)}">${prefix}${esc(addr)}${esc(timeStr)}</div>`;
     }).join('');
     if (more > 0) evHtml += `<div class="cal-more">+${more} more</div>`;
 
@@ -4958,6 +4970,20 @@ function openDayModal(dateStr) {
   const [y,m,d] = dateStr.split('-');
   document.getElementById('day-modal-title').textContent = `${MONTHS[parseInt(m)-1]} ${parseInt(d)}, ${y}`;
 
+  // Sort: inspections with a time first (by time), then inspections without time, then due dates
+  evs.sort((a, b) => {
+    const aIsInsp = a.inspection === dateStr;
+    const bIsInsp = b.inspection === dateStr;
+    if (aIsInsp && bIsInsp) {
+      const ta = a.inspectionTime || '99:99';
+      const tb = b.inspectionTime || '99:99';
+      return ta < tb ? -1 : ta > tb ? 1 : 0;
+    }
+    if (aIsInsp) return -1;
+    if (bIsInsp) return 1;
+    return 0;
+  });
+
   const body = document.getElementById('day-modal-body');
   if (!evs.length) {
     body.innerHTML = '<div class="day-empty">No events</div>';
@@ -4966,8 +4992,10 @@ function openDayModal(dateStr) {
       const isDue  = o.due        === dateStr;
       const isInsp = o.inspection === dateStr;
       const color  = apColor(o.appraiserId);
+      const timeStr = isInsp && o.inspectionTime
+        ? `<span class="day-ev-time">${esc(fmtTime12(o.inspectionTime))}</span>` : '';
       return `<div class="day-ev-card" style="border-left-color:${color}" onclick="closeDayModal();openDetail('${o.id}')">
-        <div class="day-ev-type">${isDue && isInsp ? '📅 Due + 🔍 Inspection' : isDue ? '📅 Due Date' : '🔍 Inspection'}</div>
+        <div class="day-ev-type">${isDue && isInsp ? '📅 Due + 🔍 Inspection' : isDue ? '📅 Due Date' : '🔍 Inspection'}${timeStr}</div>
         <div class="day-ev-addr">${esc(o.address.split(',')[0])}</div>
         <div class="day-ev-meta">${esc(o.client||'')}${o.client&&(o.lender||o.amc)?' · ':''}${esc(o.lender||o.amc||'')}
           <span style="margin-left:6px;color:${color};font-weight:600">${esc(apName(o.appraiserId))}</span>
@@ -7362,6 +7390,17 @@ function normalizePurpose(s) {
 }
 
 // Normalize "03 Nov 2026" → "2026-11-03"
+// Convert "14:30" or "09:00" → "2:30 PM" or "9:00 AM"
+function fmtTime12(t) {
+  if (!t) return '';
+  const [hStr, mStr] = t.split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr || '00';
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${m} ${ampm}`;
+}
+
 function normalizeDateWords(s) {
   const months = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
   const m = s.trim().match(/(\d{1,2})\s+(\w{3})\s+(\d{4})/);
