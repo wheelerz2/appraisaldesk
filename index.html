@@ -3537,6 +3537,14 @@ function renderDashboard() {
   const body = document.getElementById('dash-body');
   if (!body) return;
 
+  // Guard: orders array must exist (may not be ready on very first paint)
+  if (typeof orders === 'undefined') return;
+
+  // Scope to logged-in appraiser's orders (same logic as buildSidebarFilters)
+  const myOrders = (!isAdmin && currentAppraiserId)
+    ? orders.filter(o => o.appraiserId === currentAppraiserId)
+    : orders;
+
   const isOpen = o => !['complete','cancelled'].includes(o.status);
 
   // ── TODAY'S INSPECTIONS ───────────────────────────────────────────────────
