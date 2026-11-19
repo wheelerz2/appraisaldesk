@@ -3316,13 +3316,27 @@ async function initFromSupabase() {
       try { localStorage.setItem('ad_settings', JSON.stringify(_cachedSettings)); } catch(e) {}
     }
 
+    // Update the crash-safe local cache with the fresh Supabase data
+    _localSaveOrders();
+
     applyTheme((loadSettings().theme) || 'system');
-    setupAutoBackup();
+    if (isAdmin) setupAutoBackup();
     showPage('dashboard');
     setCoTab('amc');
   } catch(e) {
     console.error('[AD] initFromSupabase failed', e);
-    toast('⚠ Could not load from Supabase: ' + (e.message || e));
+    // ── CRASH-SAFE RESTORE ──────────────────────────────────────────────
+    // Supabase unreachable or timed out — restore from local cache so data
+    // isn't lost. The user sees a warning but their orders are still there.
+    const cached = _localLoadOrders();
+    if (cached && cached.length > 0) {
+      orders = cached;
+      const ts = _localOrdersTimestamp();
+      const ago = ts ? ' (cached ' + new Date(ts).toLocaleTimeString() + ')' : '';
+      toast('⚠ Supabase unreachable — showing locally cached data' + ago);
+    } else {
+      toast('⚠ Could not load from Supabase: ' + (e.message || e));
+    }
     showPage('dashboard');
     setCoTab('amc');
   } finally {
@@ -3377,11 +3391,51 @@ let licenseImages = {};
 // All actual persistence goes through the targeted sb* helpers below.
 function save(key, data) { /* no-op: Supabase version uses targeted saves */ }
 
+// ── LOCAL STORAGE CRASH-SAFE CACHE ───────────────────────────────────────
+// Writes the full orders array to localStorage after every change.
+// On load, if Supabase is unreachable or returns nothing, this cache restores data.
+const LS_ORDERS_KEY = 'ad_orders_cache';
+const LS_ORDERS_TS  = 'ad_orders_cache_ts';
+
+function _localSaveOrders() {
+  try {
+    localStorage.setItem(LS_ORDERS_KEY, JSON.stringify(orders));
+    localStorage.setItem(LS_ORDERS_TS,  new Date().toISOString());
+  } catch(e) { console.warn('[AD] localStorage write failed', e); }
+}
+
+function _localLoadOrders() {
+  try {
+    const raw = localStorage.getItem(LS_ORDERS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch(e) { return null; }
+}
+
+function _localOrdersTimestamp() {
+  try { return localStorage.getItem(LS_ORDERS_TS) || null; } catch(e) { return null; }
+}
+
+// Heartbeat: silently write to localStorage every 60 seconds while app is open
+setInterval(() => { if (orders.length > 0) _localSaveOrders(); }, 60000);
+
+// Also save on page hide/unload (tab close, navigation away)
+window.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && orders.length > 0) _localSaveOrders();
+});
+window.addEventListener('beforeunload', () => {
+  if (orders.length > 0) _localSaveOrders();
+});
+
 // ── Per-record Supabase save helpers ────────────────────────────────────
 function _sbUpsertOrder(rec) {
-  if (rec) sbSave('orders', rec).catch(e => console.warn('[AD] upsertOrder', e));
+  if (!rec) return;
+  _localSaveOrders(); // write cache immediately — before async Supabase
+  sbSave('orders', rec).catch(e => console.warn('[AD] upsertOrder', e));
 }
 function _sbDeleteOrder(id) {
+  _localSaveOrders(); // cache reflects deletion (orders array already updated)
   sbDelete('orders', id).catch(e => console.warn('[AD] deleteOrder', e));
 }
 function _sbUpsertAppraiser(rec) {
@@ -3594,7 +3648,8 @@ function renderDashboard() {
   const openAll     = myOrders.filter(isOpen);
 
   // ── STAT TILES ────────────────────────────────────────────────────────────
-  const dueToday = myOrders.filter(o => o.dueDate === todayStr && isOpen(o));
+  const dueToday  = myOrders.filter(o => o.due === todayStr && isOpen(o) && o.status !== 'onhold');
+  const overdue   = myOrders.filter(o => o.due && o.due < todayStr && isOpen(o) && o.status !== 'onhold');
   statsEl.innerHTML = `
     <div class="dash-stat" onclick="showPage('orders')" title="All open orders">
       <div class="dash-stat-num" style="color:var(--accent)">${openAll.length}</div>
@@ -3604,13 +3659,13 @@ function renderDashboard() {
       <div class="dash-stat-num" style="color:var(--s-inspection)">${todayInsp.length}</div>
       <div class="dash-stat-label">Today's Inspections</div>
     </div>
-    <div class="dash-stat" title="Unscheduled open orders">
-      <div class="dash-stat-num" style="color:var(--s-review)">${unscheduled.length}</div>
-      <div class="dash-stat-label">Needs Scheduling</div>
-    </div>
     <div class="dash-stat" title="Orders due today">
       <div class="dash-stat-num" style="color:${dueToday.length > 0 ? 'var(--s-questionnaire)' : 'var(--muted)'}">${dueToday.length}</div>
       <div class="dash-stat-label">Due Today</div>
+    </div>
+    <div class="dash-stat" title="Past due date, still open (excludes On Hold)">
+      <div class="dash-stat-num" style="color:${overdue.length > 0 ? '#dc2626' : 'var(--muted)'}">${overdue.length}</div>
+      <div class="dash-stat-label">Overdue</div>
     </div>
   `;
 
@@ -3649,7 +3704,7 @@ function renderDashboard() {
         <div class="dash-row-addr" title="${esc(addr)}">${esc(addr)}</div>
         <div class="dash-row-meta">
           <span class="dash-row-pill" style="background:color-mix(in srgb,${sc} 15%,transparent);color:${sc}">${esc(pill)}</span>
-          ${o.dueDate ? `<span>Due ${esc(o.dueDate)}</span>` : ''}
+          ${o.due ? `<span>Due ${esc(o.due)}</span>` : ''}
           ${client ? `<span>· ${esc(client)}</span>` : ''}
         </div>
       </div>
@@ -9594,6 +9649,9 @@ let _backupDirHandle = null; // File System Access API directory handle
         if (perm === 'granted') {
           _backupDirHandle = req.result;
           updateBackupFolderLabel();
+          // Re-arm the auto-backup timer now that the handle is restored.
+          // isAdmin may not be set yet at page load, so defer briefly.
+          setTimeout(() => { if (isAdmin) setupAutoBackup(); }, 500);
         }
       } catch(e) {}
     };
@@ -9826,6 +9884,7 @@ function saveAutoBackupSettings() {
 
 function setupAutoBackup() {
   if (autoBackupTimer) { clearInterval(autoBackupTimer); autoBackupTimer = null; }
+  if (!isAdmin) return; // Auto-backup runs on admin account only
   const s = loadSettings();
   const ab = s.autoBackup || {};
   if (ab.enabled && ab.interval) {
@@ -10100,7 +10159,7 @@ window.addEventListener('unhandledrejection', function(e) {
     const s = loadSettings();
     applyTheme(s.theme || 'system');
   } catch(e) { applyTheme('system'); }
-  try { setupAutoBackup(); } catch(e) {}
+  // Auto-backup is set up after login (admin-only); skip at cold boot.
 
   // One-time migration: if auth system is new (v2), clear any pre-auth localStorage session
   try {
