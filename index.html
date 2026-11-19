@@ -794,6 +794,68 @@ body.is-admin .admin-only { display: block !important; }
 .day-ev-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .day-empty { text-align: center; padding: 24px 0; color: var(--muted); font-size: 14px; }
 
+/* ── DASHBOARD ── */
+#dash-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+#dash-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#dash-date { font-size: 15px; font-weight: 600; color: var(--text); }
+#dash-body {
+  flex: 1; overflow-y: auto;
+  padding: 16px 20px 24px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+.dash-section { display: flex; flex-direction: column; gap: 10px; }
+.dash-section-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--muted);
+  display: flex; align-items: center; gap: 8px;
+}
+.dash-section-title span.dash-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 6px;
+  background: var(--accent); color: #fff;
+  border-radius: 10px; font-size: 11px; font-weight: 700; letter-spacing: 0;
+}
+.dash-card {
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px;
+  display: flex; align-items: flex-start; gap: 10px;
+  cursor: pointer; transition: border-color .15s;
+}
+.dash-card:hover { border-color: var(--accent); }
+.dash-card-color { width: 4px; align-self: stretch; border-radius: 3px; flex-shrink: 0; }
+.dash-card-body { flex: 1; min-width: 0; }
+.dash-card-addr { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-card-meta { font-size: 12px; color: var(--muted); margin-top: 3px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dash-card-time { font-size: 12px; font-weight: 700; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); padding: 1px 7px; border-radius: 4px; }
+.dash-card-status { font-size: 11px; padding: 2px 8px; border-radius: 5px; font-weight: 600; }
+.dash-ap-group { display: flex; flex-direction: column; gap: 8px; }
+.dash-ap-header {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 700; color: var(--text);
+  padding: 4px 0 2px;
+}
+.dash-ap-avatar {
+  width: 26px; height: 26px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.dash-empty { text-align: center; padding: 20px 0; color: var(--muted); font-size: 13px; font-style: italic; }
+.dash-tomorrow-card {
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 14px;
+  display: flex; align-items: center; gap: 10px;
+  cursor: pointer; transition: border-color .15s;
+}
+.dash-tomorrow-card:hover { border-color: var(--accent); }
+.dash-tomorrow-time { font-size: 12px; font-weight: 700; color: var(--accent); min-width: 54px; }
+.dash-tomorrow-addr { font-size: 13px; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-tomorrow-ap { font-size: 11px; color: var(--muted); }
+
 /* ── APPRAISERS ── */
 #appraisers-page .main-content { display: flex; flex-direction: column; gap: 20px; }
 .page-header {
@@ -1707,7 +1769,8 @@ body.is-admin .admin-only { display: block !important; }
 <nav id="nav">
   <div id="nav-brand" onclick="refreshFromDb()" title="Click to refresh data" style="cursor:pointer">Appraisal<span>Desk</span><small id="nav-version" style="font-size:10px;font-weight:400;opacity:.55;margin-left:6px;letter-spacing:.03em;font-family:inherit">v2.0</small></div>
   <div id="nav-tabs">
-    <button class="nav-tab active" onclick="showPage('orders')">Orders</button>
+    <button class="nav-tab active" onclick="showPage('dashboard')">🏠 Dashboard</button>
+    <button class="nav-tab" onclick="showPage('orders')">Orders</button>
     <button class="nav-tab" onclick="showPage('map')">🗺 Map</button>
     <button class="nav-tab" onclick="showPage('calendar')">Calendar</button>
     <button class="nav-tab admin-only" onclick="showPage('appraisers')">Appraisers</button>
@@ -1725,8 +1788,19 @@ body.is-admin .admin-only { display: block !important; }
 
 <div id="app">
 
+  <!-- ════════════ DASHBOARD PAGE ════════════ -->
+  <div class="page active" id="dashboard-page">
+    <div id="dash-wrap">
+      <div id="dash-header">
+        <div id="dash-date"></div>
+        <button class="sort-btn" onclick="renderDashboard()" title="Refresh dashboard" style="margin-left:auto">↻ Refresh</button>
+      </div>
+      <div id="dash-body"></div>
+    </div>
+  </div>
+
   <!-- ════════════ ORDERS PAGE ════════════ -->
-  <div class="page active" id="orders-page">
+  <div class="page" id="orders-page">
     <aside class="sidebar">
       <div class="sidebar-section">
         <input class="sidebar-search" type="search" placeholder="Search orders…" id="search-input" oninput="onSearch(this.value)">
@@ -3150,8 +3224,7 @@ let _cachedSettings = null;
 
 async function initFromSupabase() {
   if (!_sbHasConfig()) {
-    buildSidebarFilters();
-    renderOrders();
+    showPage('dashboard');
     setCoTab('amc');
     return;
   }
@@ -3201,14 +3274,12 @@ async function initFromSupabase() {
 
     applyTheme((loadSettings().theme) || 'system');
     setupAutoBackup();
-    buildSidebarFilters();
-    renderOrders();
+    showPage('dashboard');
     setCoTab('amc');
   } catch(e) {
     console.error('[AD] initFromSupabase failed', e);
     toast('⚠ Could not load from Supabase: ' + (e.message || e));
-    buildSidebarFilters();
-    renderOrders();
+    showPage('dashboard');
     setCoTab('amc');
   } finally {
     const el = document.getElementById('sb-loading');
@@ -3449,6 +3520,145 @@ function apName(id) {
 }
 
 // ══════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════
+function renderDashboard() {
+  const today     = new Date();
+  const todayStr  = today.toISOString().slice(0, 10);
+  const tomorrow  = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+
+  // Update date header
+  const dateEl = document.getElementById('dash-date');
+  if (dateEl) {
+    dateEl.textContent = today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
+  const body = document.getElementById('dash-body');
+  if (!body) return;
+
+  const isOpen = o => !['complete','cancelled'].includes(o.status);
+
+  // ── TODAY'S INSPECTIONS ───────────────────────────────────────────────────
+  const todayInsp = myOrders
+    .filter(o => o.inspection === todayStr)
+    .sort((a, b) => {
+      const ta = a.inspectionTime || '99:99';
+      const tb = b.inspectionTime || '99:99';
+      return ta < tb ? -1 : ta > tb ? 1 : 0;
+    });
+
+  const inspHtml = todayInsp.length === 0
+    ? `<div class="dash-empty">No inspections scheduled for today.</div>`
+    : todayInsp.map(o => {
+        const color  = apColor(o.appraiserId);
+        const addr   = o.address || '(No address)';
+        const ap     = apName(o.appraiserId);
+        const timeStr = o.inspectionTime ? fmtTime12(o.inspectionTime) : '';
+        return `<div class="dash-card" onclick="openDetail('${esc(o.id)}')">
+          <div class="dash-card-color" style="background:${color}"></div>
+          <div class="dash-card-body">
+            <div class="dash-card-addr" title="${esc(addr)}">${esc(addr)}</div>
+            <div class="dash-card-meta">
+              ${timeStr ? `<span class="dash-card-time">${esc(timeStr)}</span>` : ''}
+              <span>${esc(ap)}</span>
+              ${o.lender ? `<span>· ${esc(o.lender)}</span>` : ''}
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+
+  // ── NEEDS SCHEDULING (open, no inspection date) — by appraiser ────────────
+  const unscheduled = myOrders.filter(o => isOpen(o) && !o.inspection);
+
+  // Group by appraiser
+  const apGroups = {};
+  unscheduled.forEach(o => {
+    const key = o.appraiserId || '__none__';
+    if (!apGroups[key]) apGroups[key] = [];
+    apGroups[key].push(o);
+  });
+
+  // Build appraiser groups sorted: assigned appraisers first (alpha), unassigned last
+  const sortedApKeys = Object.keys(apGroups).sort((a, b) => {
+    if (a === '__none__') return 1;
+    if (b === '__none__') return -1;
+    return apName(a).localeCompare(apName(b));
+  });
+
+  const unschHtml = unscheduled.length === 0
+    ? `<div class="dash-empty">All open orders have an inspection date.</div>`
+    : sortedApKeys.map(apKey => {
+        const orders = apGroups[apKey];
+        const name   = apKey === '__none__' ? 'Unassigned' : apName(apKey);
+        const color  = apKey === '__none__' ? '#9ca3af' : apColor(apKey);
+        const inits  = apKey === '__none__' ? '?' : apInitials(apKey);
+        const cards  = orders.map(o => {
+          const addr = o.address || '(No address)';
+          const pill = STATUS_LABELS[o.status] || o.status || '';
+          const sc   = STATUS_COLOR[o.status] ? STATUS_COLOR[o.status] : '#6b7280';
+          return `<div class="dash-card" onclick="openDetail('${esc(o.id)}')">
+            <div class="dash-card-color" style="background:${color}"></div>
+            <div class="dash-card-body">
+              <div class="dash-card-addr" title="${esc(addr)}">${esc(addr)}</div>
+              <div class="dash-card-meta">
+                <span class="dash-card-status" style="background:color-mix(in srgb,${sc} 15%,transparent);color:${sc}">${esc(pill)}</span>
+                ${o.dueDate ? `<span>Due ${esc(o.dueDate)}</span>` : ''}
+                ${o.amc ? `<span>· ${esc(o.amc)}</span>` : (o.lender ? `<span>· ${esc(o.lender)}</span>` : '')}
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+        return `<div class="dash-ap-group">
+          <div class="dash-ap-header">
+            <div class="dash-ap-avatar" style="background:${color}">${esc(inits)}</div>
+            ${esc(name)} <span style="color:var(--muted);font-weight:400">(${orders.length})</span>
+          </div>
+          ${cards}
+        </div>`;
+      }).join('');
+
+  // ── TOMORROW'S INSPECTIONS ────────────────────────────────────────────────
+  const tomorrowInsp = myOrders
+    .filter(o => o.inspection === tomorrowStr)
+    .sort((a, b) => {
+      const ta = a.inspectionTime || '99:99';
+      const tb = b.inspectionTime || '99:99';
+      return ta < tb ? -1 : ta > tb ? 1 : 0;
+    });
+
+  const tmrHtml = tomorrowInsp.length === 0
+    ? `<div class="dash-empty">No inspections scheduled for tomorrow.</div>`
+    : tomorrowInsp.map(o => {
+        const color  = apColor(o.appraiserId);
+        const addr   = o.address || '(No address)';
+        const ap     = apName(o.appraiserId);
+        const timeStr = o.inspectionTime ? fmtTime12(o.inspectionTime) : '—';
+        return `<div class="dash-tomorrow-card" onclick="openDetail('${esc(o.id)}')">
+          <div class="dash-card-color" style="background:${color};width:3px;align-self:stretch;border-radius:2px;flex-shrink:0"></div>
+          <div class="dash-tomorrow-time">${esc(timeStr)}</div>
+          <div class="dash-tomorrow-addr" title="${esc(addr)}">${esc(addr)}</div>
+          <div class="dash-tomorrow-ap">${esc(ap)}</div>
+        </div>`;
+      }).join('');
+
+  body.innerHTML = `
+    <div class="dash-section">
+      <div class="dash-section-title">🔍 Today's Inspections <span class="dash-badge">${todayInsp.length}</span></div>
+      ${inspHtml}
+    </div>
+    <div class="dash-section">
+      <div class="dash-section-title">📋 Needs Scheduling <span class="dash-badge">${unscheduled.length}</span></div>
+      ${unschHtml}
+    </div>
+    <div class="dash-section">
+      <div class="dash-section-title">📅 Tomorrow's Inspections <span class="dash-badge">${tomorrowInsp.length}</span></div>
+      ${tmrHtml}
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════
 // PAGE NAV
 // ══════════════════════════════════════════
 function showPage(name) {
@@ -3456,9 +3666,10 @@ function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(name + '-page').classList.add('active');
   document.querySelectorAll('.nav-tab').forEach((t, i) => {
-    const pages = ['orders','map','calendar','appraisers','companies','income','accounting','settings'];
+    const pages = ['dashboard','orders','map','calendar','appraisers','companies','income','accounting','settings'];
     t.classList.toggle('active', pages[i] === name);
   });
+  if (name === 'dashboard') renderDashboard();
   if (name === 'orders') { buildSidebarFilters(); renderOrders(); }
   if (name === 'map') renderMapPage();
   if (name === 'calendar') renderCalendar();
