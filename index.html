@@ -2016,7 +2016,7 @@ body.is-admin .admin-only { display: block !important; }
         <table class="income-table">
           <thead>
             <tr>
-              <th>Submitted</th>
+              <th colspan="2" style="text-align:center;border-right:1px solid var(--border);padding-bottom:3px;font-size:9px;letter-spacing:.08em">DATES</th>
               <th>Address</th>
               <th>Client</th>
               <th>AMC / Lender</th>
@@ -2024,6 +2024,11 @@ body.is-admin .admin-only { display: block !important; }
               <th class="num">Total Fee</th>
               <th class="num">Split %</th>
               <th class="num">Appraiser $</th>
+            </tr>
+            <tr>
+              <th style="color:var(--muted);font-weight:600">Created</th>
+              <th style="color:var(--muted);font-weight:600;border-right:1px solid var(--border)">Sent</th>
+              <th></th><th></th><th></th><th></th><th></th><th></th><th></th>
             </tr>
           </thead>
           <tbody id="income-tbody"></tbody>
@@ -2081,7 +2086,7 @@ body.is-admin .admin-only { display: block !important; }
         <table class="income-table acct-invoice-table">
           <thead>
             <tr>
-              <th>Date</th>
+              <th colspan="2" style="text-align:center;border-right:1px solid var(--border);padding-bottom:2px;font-size:11px;letter-spacing:.06em">DATES</th>
               <th>Address</th>
               <th>Client / Borrower</th>
               <th>Lender / AMC</th>
@@ -2089,6 +2094,11 @@ body.is-admin .admin-only { display: block !important; }
               <th class="num">Paid</th>
               <th class="num">Balance</th>
               <th>Status</th>
+            </tr>
+            <tr>
+              <th style="color:var(--muted);font-weight:600">Created</th>
+              <th style="color:var(--muted);font-weight:600;border-right:1px solid var(--border)">Sent</th>
+              <th></th><th></th><th></th><th></th><th></th><th></th><th></th>
             </tr>
           </thead>
           <tbody id="acct-tbody"></tbody>
@@ -8234,7 +8244,7 @@ function renderIncome() {
   // Build table
   const tbody = document.getElementById('income-tbody');
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="income-empty">No orders match the current filters.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="income-empty">No orders match the current filters.</td></tr>`;
     return;
   }
 
@@ -8262,7 +8272,7 @@ function renderIncome() {
       pEarn += Math.round(o.fee * ((o.feeSplit != null ? o.feeSplit : 100) / 100));
     });
 
-    html += `<tr class="income-period-header"><td colspan="8">${esc(periodLabel)} — ${periodRows.length} order${periodRows.length!==1?'s':''}</td></tr>`;
+    html += `<tr class="income-period-header"><td colspan="9">${esc(periodLabel)} — ${periodRows.length} order${periodRows.length!==1?'s':''}</td></tr>`;
 
     // Within each period, group by appraiser
     const apGrouped = {};
@@ -8283,14 +8293,15 @@ function renderIncome() {
         apEarn += Math.round(o.fee * ((o.feeSplit != null ? o.feeSplit : 100) / 100));
       });
 
-      html += `<tr class="section-header"><td colspan="8">${esc(apLabel)} — ${apRows.length} order${apRows.length!==1?'s':''}</td></tr>`;
+      html += `<tr class="section-header"><td colspan="9">${esc(apLabel)} — ${apRows.length} order${apRows.length!==1?'s':''}</td></tr>`;
 
       apRows.forEach(o => {
         const split = o.feeSplit != null ? o.feeSplit : 100;
         const earn  = Math.round(o.fee * split / 100);
         const party = o.amc || o.lender || '—';
         html += `<tr onclick="openDetail('${o.id}')" style="cursor:pointer">
-          <td>${o.created ? fmt(o.created.slice(0,10)) : '—'}</td>
+          <td style="white-space:nowrap">${o.created ? fmt(o.created.slice(0,10)) : '—'}</td>
+          <td style="white-space:nowrap;border-right:1px solid var(--border)">${o.orderSent ? fmt(o.orderSent) : '—'}</td>
           <td>${esc(o.address.split(',')[0])}</td>
           <td>${esc(o.client||'—')}</td>
           <td>${esc(party)}</td>
@@ -8302,7 +8313,7 @@ function renderIncome() {
       });
 
       html += `<tr class="total-row">
-        <td colspan="5" style="text-align:right;font-size:12px">Subtotal — ${esc(apLabel)}</td>
+        <td colspan="6" style="text-align:right;font-size:12px">Subtotal — ${esc(apLabel)}</td>
         <td class="num">$${apFee.toLocaleString()}</td>
         <td class="num"></td>
         <td class="num">$${apEarn.toLocaleString()}</td>
@@ -8310,7 +8321,7 @@ function renderIncome() {
     });
 
     html += `<tr class="total-row" style="border-top:2px solid var(--border)">
-      <td colspan="5" style="text-align:right;font-size:12px;font-weight:700">${esc(periodLabel)} Total</td>
+      <td colspan="6" style="text-align:right;font-size:12px;font-weight:700">${esc(periodLabel)} Total</td>
       <td class="num" style="font-weight:700">$${pFee.toLocaleString()}</td>
       <td class="num"></td>
       <td class="num" style="font-weight:700">$${pEarn.toLocaleString()}</td>
@@ -8318,7 +8329,7 @@ function renderIncome() {
   });
 
   html += `<tr class="grand-total">
-    <td colspan="5" style="text-align:right">Grand Total</td>
+    <td colspan="6" style="text-align:right">Grand Total</td>
     <td class="num">$${grandFee.toLocaleString()}</td>
     <td class="num"></td>
     <td class="num">$${grandEarn.toLocaleString()}</td>
@@ -8518,7 +8529,7 @@ function renderAccounting() {
   const tbody = document.getElementById('acct-tbody');
   if (!tbody) return;
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="income-empty">No invoices match this filter</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="income-empty">No invoices match this filter</td></tr>`;
     return;
   }
 
@@ -8527,7 +8538,8 @@ function renderAccounting() {
 
   tbody.innerHTML = filtered.map(o => `
     <tr style="cursor:pointer" onclick="showPage('orders');setTimeout(()=>openDetail('${o.id}'),80)">
-      <td>${fmt(o.due)}</td>
+      <td style="white-space:nowrap">${o.created ? fmt(o.created.slice(0,10)) : '—'}</td>
+      <td style="white-space:nowrap;border-right:1px solid var(--border)">${o.orderSent ? fmt(o.orderSent) : '—'}</td>
       <td>${esc(o.address||'—')}</td>
       <td>${esc(o.client||'—')}</td>
       <td>${esc(o.amc||o.lender||'—')}</td>
@@ -8883,7 +8895,8 @@ function printInvoiceReport() {
     const badgeCls = o._status==='paid'?'badge-paid':o._status==='partial'?'badge-partial':'badge-open';
     const badgeTxt = o._status==='paid'?'Paid':o._status==='partial'?'Partial':'Open';
     return `<tr>
-      <td>${fmt(o.due)||'—'}</td>
+      <td style="white-space:nowrap">${o.created ? fmt(o.created.slice(0,10)) : '—'}</td>
+      <td style="white-space:nowrap">${o.orderSent ? fmt(o.orderSent) : '—'}</td>
       <td>${esc(o.address||'—')}</td>
       <td>${esc(o.client||'—')}</td>
       <td>${esc(o.amc||o.lender||'—')}</td>
@@ -8899,9 +8912,12 @@ function printInvoiceReport() {
   const filtBal    = filtered.reduce((s,o)=>s+o._balance,0);
 
   const tableHtml = `<table>
-    <thead><tr><th>Date</th><th>Address</th><th>Client / Borrower</th><th>Lender / AMC</th><th class="num">Invoice</th><th class="num">Paid</th><th class="num">Balance</th><th style="text-align:center">Status</th></tr></thead>
-    <tbody>${rowsHtml || '<tr><td colspan="8" style="text-align:center;color:#999;padding:20px">No records</td></tr>'}</tbody>
-    <tfoot><tr><td colspan="4">Showing ${filtered.length} of ${allInvoices.length} invoices</td><td class="num">$${filtBilled.toFixed(2)}</td><td class="num">$${filtPaid.toFixed(2)}</td><td class="num">$${filtBal.toFixed(2)}</td><td></td></tr></tfoot>
+    <thead>
+      <tr><th colspan="2" style="text-align:center">DATES</th><th>Address</th><th>Client / Borrower</th><th>Lender / AMC</th><th class="num">Invoice</th><th class="num">Paid</th><th class="num">Balance</th><th style="text-align:center">Status</th></tr>
+      <tr><th>Created</th><th>Sent</th><th></th><th></th><th></th><th></th><th></th><th></th><th></th></tr>
+    </thead>
+    <tbody>${rowsHtml || '<tr><td colspan="9" style="text-align:center;color:#999;padding:20px">No records</td></tr>'}</tbody>
+    <tfoot><tr><td colspan="5">Showing ${filtered.length} of ${allInvoices.length} invoices</td><td class="num">$${filtBilled.toFixed(2)}</td><td class="num">$${filtPaid.toFixed(2)}</td><td class="num">$${filtBal.toFixed(2)}</td><td></td></tr></tfoot>
   </table>`;
 
   _buildPrintWindow(
