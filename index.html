@@ -2114,6 +2114,10 @@ body.is-admin .admin-only { display: block !important; }
           <select id="ap-pay-appraiser" onchange="renderAppraisalPayments()" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px">
             <option value="all">All Appraisers</option>
           </select>
+          <select id="ap-tax-year" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px">
+            <option value="">— Tax Year —</option>
+          </select>
+          <button class="btn-secondary" onclick="printAppraiserTaxReport()" style="font-size:13px;padding:6px 14px;background:var(--accent);color:#fff;border-color:var(--accent)">🖨 Tax Report</button>
           <button class="btn-secondary" onclick="printAppraisalPayments()" style="font-size:13px;padding:6px 14px">🖨 Print Report</button>
           <button class="btn-secondary" onclick="emailAppraisalPayments()" style="font-size:13px;padding:6px 14px">✉️ Email Report</button>
         </div>
@@ -2179,7 +2183,7 @@ body.is-admin .admin-only { display: block !important; }
           <div class="settings-firm-row">
             <div class="settings-field">
               <label>Firm / Business Name</label>
-              <input type="text" id="set-firm-name" placeholder="RH Appraisal">
+              <input type="text" id="set-firm-name" placeholder="Richard Hahn Appraisal LLC">
             </div>
             <div class="settings-field">
               <label>Your Name</label>
@@ -4426,7 +4430,7 @@ function smsAppraiser(id) {
   const contactPhone = o.inspContactPhone || o.contactPhone || o.phone;
   if (contactName)  parts.push(`Contact: ${contactName}${contactPhone ? ' ' + contactPhone : ''}`);
   else if (contactPhone) parts.push(`Contact: ${contactPhone}`);
-  parts.push('— RH Appraisal');
+  parts.push('— Richard Hahn Appraisal LLC');
 
   const phone = ap.phone.replace(/\D/g, '');
   const body  = encodeURIComponent(parts.join('\n'));
@@ -4463,7 +4467,7 @@ function emailAppraiser(id) {
 
   if (o.notes) { lines.push(''); lines.push(`Notes: ${o.notes}`); }
 
-  lines.push('', 'Thank you,', 'RH Appraisal');
+  lines.push('', 'Thank you,', 'Richard Hahn Appraisal LLC');
 
   const mailto = `mailto:${encodeURIComponent(ap.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`;
   window.open(mailto, '_blank');
@@ -8093,7 +8097,7 @@ function updateIcalBtn() {
   const ics = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//RH Appraisal//AppraisalDesk//EN',
+    'PRODID:-//Richard Hahn Appraisal LLC//AppraisalDesk//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
@@ -8721,6 +8725,18 @@ function renderAppraisalPayments() {
   sel.innerHTML = '<option value="all">All Appraisers</option>' +
     apList.map(a => `<option value="${a.id}"${currentVal===a.id?' selected':''}>${esc(a.name)}</option>`).join('');
 
+  // Populate tax year dropdown from paid orders
+  const taxSel = document.getElementById('ap-tax-year');
+  if (taxSel) {
+    const curTaxVal = taxSel.value;
+    const paidYears = [...new Set(
+      orders.filter(o => o.appraiserPaid).map(o => o.appraiserPaid.slice(0,4))
+    )].sort().reverse();
+    taxSel.innerHTML = '<option value="">— Tax Year —</option>' +
+      paidYears.map(y => `<option value="${y}"${curTaxVal===y?' selected':''}>${y}</option>`).join('');
+    if (!taxSel.value && paidYears.length) taxSel.value = paidYears[0]; // default to most recent
+  }
+
   // Only completed orders with a fee and an appraiser assigned
   const apOrders = orders.filter(o => o.fee > 0 && o.appraiserId && o.status === 'complete' &&
     (isAdmin || !currentAppraiserId || o.appraiserId === currentAppraiserId));
@@ -8830,7 +8846,7 @@ function _buildPrintWindow(title, subtitle, tableHtml, summaryHtml) {
   </style></head><body>
   <div class="rpt-header">
     <div>
-      <div class="rpt-co">RH Appraisal</div>
+      <div class="rpt-co">Richard Hahn Appraisal LLC</div>
       <div class="rpt-co-sub">rhappraisal.com</div>
     </div>
     <div>
@@ -8921,6 +8937,317 @@ function _buildPrintWindow(title, subtitle, tableHtml, summaryHtml) {
 </div>
 
 <script>
+function printAppraiserTaxReport() {
+  const apSel   = document.getElementById('ap-pay-appraiser');
+  const yearSel = document.getElementById('ap-tax-year');
+  const taxYear = yearSel ? yearSel.value : '';
+
+  if (!taxYear) { toast('Select a tax year first'); return; }
+
+  const selApId = apSel ? apSel.value : 'all';
+  const dateStr = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+
+  // All completed orders paid to appraiser in the selected year
+  const baseOrders = orders.filter(o =>
+    o.fee > 0 && o.appraiserId && o.status === 'complete' &&
+    o.appraiserPaid && o.appraiserPaid.startsWith(taxYear) &&
+    (isAdmin || !currentAppraiserId || o.appraiserId === currentAppraiserId)
+  );
+
+  // Determine which appraisers to report on
+  const apIds = selApId === 'all'
+    ? [...new Set(baseOrders.map(o => o.appraiserId))]
+    : [selApId];
+
+  if (!apIds.length || !baseOrders.length) { toast('No paid orders found for ' + taxYear); return; }
+
+  const fmtD = d => { if (!d) return '—'; const [y,m,dy] = d.split('-'); return `${parseInt(m)}/${parseInt(dy)}/${y}`; };
+  const earn = o => Math.round((parseFloat(o.fee)||0) * ((o.feeSplit!=null?o.feeSplit:100)/100));
+
+  // Helper: build a 1099-NEC style form for one appraiser
+  function build1099(apRec, totalPaid, yr) {
+    const apAddr1 = apRec.address || '';
+    const apCity  = apRec.city || '';
+    const apAddrState = apRec.addrState || apRec.state || '';
+    const apZip   = apRec.zip || '';
+    const apCityLine = [apCity, apAddrState, apZip].filter(Boolean).join(', ');
+    const ssnRaw  = apRec.ssn || '';
+    // Mask SSN for display: show last 4 only if populated
+    const ssnDisp = ssnRaw ? ssnRaw.replace(/\d(?=\d{4})/g,'*') : '___-__-____';
+    const totalFmt = '$' + totalPaid.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+
+    return `
+    <div class="form1099 page-break">
+      <div class="f-title-bar">
+        <div class="f-title-left">
+          <div class="f-irs-label">1099-NEC</div>
+          <div class="f-irs-year">${yr}</div>
+        </div>
+        <div class="f-title-center">
+          <div class="f-form-name">Nonemployee Compensation</div>
+          <div class="f-form-sub">Internal Revenue Service — For information only. File the official IRS form for tax submission.</div>
+        </div>
+        <div class="f-title-right">
+          <div class="f-omb">OMB No. 1545-0116</div>
+        </div>
+      </div>
+
+      <div class="f-body">
+        <!-- PAYER -->
+        <div class="f-payer-block">
+          <div class="f-field-label">PAYER'S name, street address, city or town, state or province, country, ZIP</div>
+          <div class="f-field-val f-payer-name">Richard Hahn Appraisal LLC</div>
+          <div class="f-field-val">rhappraisal.com</div>
+          <div class="f-field-val f-muted">(Address on file with IRS)</div>
+        </div>
+
+        <!-- PAYER TIN / RECIPIENT TIN row -->
+        <div class="f-tin-row">
+          <div class="f-tin-cell">
+            <div class="f-field-label">PAYER'S TIN</div>
+            <div class="f-field-val">__-_______</div>
+          </div>
+          <div class="f-tin-cell">
+            <div class="f-field-label">RECIPIENT'S TIN</div>
+            <div class="f-field-val f-ssn">${ssnDisp}</div>
+            ${!ssnRaw ? '<div class="f-warn">⚠ SSN not on file — update appraiser profile</div>' : ''}
+          </div>
+        </div>
+
+        <!-- RECIPIENT -->
+        <div class="f-recip-block">
+          <div class="f-field-label">RECIPIENT'S name</div>
+          <div class="f-field-val f-recip-name">${esc(apRec.name||'')}</div>
+          <div class="f-field-label" style="margin-top:6px">Street address (including apt. no.)</div>
+          <div class="f-field-val">${esc(apAddr1)||'(no address on file)'}</div>
+          <div class="f-field-label" style="margin-top:6px">City or town, state or province, country, and ZIP</div>
+          <div class="f-field-val">${esc(apCityLine)||'—'}</div>
+        </div>
+
+        <!-- BOXES ROW -->
+        <div class="f-boxes-row">
+          <div class="f-box f-box-main">
+            <div class="f-box-num">1</div>
+            <div class="f-box-label">Nonemployee compensation</div>
+            <div class="f-box-val">${totalFmt}</div>
+          </div>
+          <div class="f-box">
+            <div class="f-box-num">2</div>
+            <div class="f-box-label">Payer made direct sales totaling $5,000 or more of consumer products to recipient</div>
+            <div class="f-box-val f-muted">☐</div>
+          </div>
+          <div class="f-box">
+            <div class="f-box-num">4</div>
+            <div class="f-box-label">Federal income tax withheld</div>
+            <div class="f-box-val">$0.00</div>
+          </div>
+          <div class="f-box">
+            <div class="f-box-num">5</div>
+            <div class="f-box-label">State tax withheld</div>
+            <div class="f-box-val">$0.00</div>
+          </div>
+          <div class="f-box">
+            <div class="f-box-num">6</div>
+            <div class="f-box-label">State/Payer's state no.</div>
+            <div class="f-box-val f-muted">—</div>
+          </div>
+          <div class="f-box">
+            <div class="f-box-num">7</div>
+            <div class="f-box-label">State income</div>
+            <div class="f-box-val f-muted">—</div>
+          </div>
+        </div>
+
+        <div class="f-disclaimer">
+          <strong>For Recipient:</strong> This is important tax information and is being furnished to the IRS. If you are required to file a return, a negligence penalty or other sanction may be imposed on you if this income is taxable and the IRS determines that it has not been reported. This form is generated by AppraisalDesk for record-keeping purposes. File the official IRS Form 1099-NEC for tax submission.
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // Build one detail section + 1099 per appraiser
+  let sectionsHtml = '';
+  let grandTotal = 0;
+  let sectionIdx = 0;
+
+  apIds.forEach((apId) => {
+    const apRows = baseOrders.filter(o => o.appraiserId === apId)
+      .sort((a,b) => (a.appraiserPaid||'').localeCompare(b.appraiserPaid||''));
+    if (!apRows.length) return;
+
+    const apRec    = appraisers.find(a => a.id === apId) || {};
+    const apLabel  = apRec.name || apName(apId);
+    const totalPaid = apRows.reduce((s,o) => s + earn(o), 0);
+    grandTotal += totalPaid;
+
+    const rowsHtml = apRows.map((o,i) => `
+      <tr>
+        <td style="text-align:center;color:#666">${i+1}</td>
+        <td style="white-space:nowrap">${fmtD(o.appraiserPaid)}</td>
+        <td style="white-space:nowrap">${o.created ? fmtD(o.created.slice(0,10)) : '—'}</td>
+        <td>${(o.address||'—').split(',')[0]}</td>
+        <td>${esc(o.client||'—')}</td>
+        <td>${esc(o.amc||o.lender||'—')}</td>
+        <td class="num">$${(parseFloat(o.fee)||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+        <td class="num">${o.feeSplit!=null?o.feeSplit:100}%</td>
+        <td class="num" style="font-weight:600">$${earn(o).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      </tr>`).join('');
+
+    sectionsHtml += `
+      <div class="ap-section${sectionIdx > 0 ? ' page-break' : ''}">
+        <div class="ap-header">
+          <div>
+            <div class="ap-name">${esc(apLabel)}</div>
+            <div class="ap-sub">Tax Year ${taxYear} &nbsp;·&nbsp; Payments Report &nbsp;·&nbsp; Richard Hahn Appraisal LLC</div>
+          </div>
+          <div class="ap-total-box">
+            <div class="ap-total-label">Total Paid ${taxYear}</div>
+            <div class="ap-total-val">$${totalPaid.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+            <div class="ap-total-sub">${apRows.length} order${apRows.length!==1?'s':''}</div>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:32px;text-align:center">#</th>
+              <th>Date Paid</th>
+              <th>Created</th>
+              <th>Property Address</th>
+              <th>Client</th>
+              <th>AMC / Lender</th>
+              <th class="num">Total Fee</th>
+              <th class="num">Split</th>
+              <th class="num">Amount Paid</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+          <tfoot>
+            <tr>
+              <td colspan="8" style="text-align:right;font-weight:700">Total Paid to ${esc(apLabel)} — Tax Year ${taxYear}</td>
+              <td class="num" style="font-weight:700;font-size:13px">$${totalPaid.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <div class="ap-cert">
+          <strong>Certification:</strong> This report reflects all compensation paid to ${esc(apLabel)} by Richard Hahn Appraisal LLC during the ${taxYear} tax year. Generated ${dateStr}.
+        </div>
+      </div>
+      ${build1099(apRec, totalPaid, taxYear)}`;
+
+    sectionIdx++;
+  });
+
+  const multiAp = apIds.length > 1;
+  const titleName = multiAp ? 'All Appraisers' : apName(selApId);
+
+  const win = window.open('','_blank','width=1000,height=800');
+  if (!win) { toast('Pop-up blocked — allow pop-ups to print'); return; }
+
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8">
+  <title>Appraiser Tax Report ${taxYear} — ${titleName}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:11.5px;color:#111;background:#fff;padding:28px 32px}
+    .rpt-header{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #1a3a4a;padding-bottom:12px;margin-bottom:20px}
+    .rpt-co{font-size:16px;font-weight:800;color:#1a3a4a;letter-spacing:.02em}
+    .rpt-co-sub{font-size:11px;color:#555;margin-top:3px}
+    .rpt-title{font-size:18px;font-weight:700;color:#1a3a4a;text-align:right}
+    .rpt-sub{font-size:11px;color:#555;text-align:right;margin-top:3px}
+    .ap-section{margin-bottom:20px}
+    .page-break{page-break-before:always;padding-top:28px}
+    .ap-header{display:flex;justify-content:space-between;align-items:flex-start;background:#f4f7fa;border:1px solid #d0d9e4;border-radius:8px;padding:14px 18px;margin-bottom:14px}
+    .ap-name{font-size:17px;font-weight:800;color:#1a3a4a}
+    .ap-sub{font-size:11px;color:#666;margin-top:4px}
+    .ap-total-box{text-align:right;background:#1a3a4a;color:#fff;border-radius:7px;padding:10px 18px;min-width:160px}
+    .ap-total-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;opacity:.8}
+    .ap-total-val{font-size:22px;font-weight:800;margin-top:2px}
+    .ap-total-sub{font-size:10px;opacity:.7;margin-top:2px}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    thead th{background:#1a3a4a;color:#fff;padding:7px 9px;font-size:10px;font-weight:700;text-align:left;white-space:nowrap}
+    thead th.num{text-align:right}
+    tbody tr:nth-child(even){background:#f8fafb}
+    tbody tr:hover{background:#eef2ff}
+    td{padding:5px 9px;border-bottom:1px solid #e8ecf0;vertical-align:top}
+    td.num{text-align:right;font-variant-numeric:tabular-nums}
+    tfoot td{background:#e8f0e8;font-weight:700;padding:7px 9px;border-top:2px solid #1a3a4a;font-size:11.5px}
+    tfoot td.num{text-align:right}
+    .ap-cert{margin-top:12px;font-size:10px;color:#555;border-top:1px dashed #bbb;padding-top:8px;line-height:1.5}
+    .grand-summary{background:#1a3a4a;color:#fff;border-radius:8px;padding:14px 18px;margin-bottom:28px;display:flex;gap:40px;align-items:center}
+    .gs-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;opacity:.8}
+    .gs-val{font-size:20px;font-weight:800;margin-top:3px}
+    .no-print{margin-top:24px;display:flex;gap:10px}
+    .btn-p{padding:7px 18px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600}
+    .btn-p.primary{background:#1a3a4a;color:#fff}
+    .btn-p.secondary{background:#f0f4f8;color:#1a3a4a;border:1px solid #c0cad8}
+
+    /* ── 1099-NEC FORM STYLES ── */
+    .form1099{border:2px solid #333;max-width:720px;margin:0 auto 32px;font-family:'Courier New',Courier,monospace;background:#fffef5}
+    .f-title-bar{display:flex;align-items:stretch;border-bottom:2px solid #333;background:#e8e0cc}
+    .f-title-left{background:#333;color:#fff;padding:10px 14px;text-align:center;min-width:80px;display:flex;flex-direction:column;justify-content:center}
+    .f-irs-label{font-size:20px;font-weight:900;letter-spacing:.03em}
+    .f-irs-year{font-size:13px;font-weight:700;margin-top:2px}
+    .f-title-center{flex:1;padding:10px 14px}
+    .f-form-name{font-size:16px;font-weight:800;color:#111;font-family:Arial,sans-serif}
+    .f-form-sub{font-size:9px;color:#555;margin-top:3px;font-family:Arial,sans-serif;line-height:1.3}
+    .f-title-right{padding:10px 14px;text-align:right;white-space:nowrap;display:flex;align-items:center}
+    .f-omb{font-size:9px;color:#555;font-family:Arial,sans-serif}
+    .f-body{padding:0}
+    .f-payer-block{border-bottom:1px solid #aaa;padding:8px 12px}
+    .f-payer-name{font-size:15px;font-weight:700;font-family:Arial,sans-serif}
+    .f-tin-row{display:flex;border-bottom:1px solid #aaa}
+    .f-tin-cell{flex:1;padding:8px 12px;border-right:1px solid #aaa}
+    .f-tin-cell:last-child{border-right:none}
+    .f-recip-block{border-bottom:1px solid #aaa;padding:8px 12px}
+    .f-recip-name{font-size:15px;font-weight:700;font-family:Arial,sans-serif}
+    .f-boxes-row{display:flex;flex-wrap:wrap;border-bottom:1px solid #aaa}
+    .f-box{flex:1;min-width:140px;border-right:1px solid #aaa;padding:8px 12px}
+    .f-box:last-child{border-right:none}
+    .f-box-main{background:#fff8e1;min-width:200px}
+    .f-box-num{font-size:9px;font-weight:700;color:#555;font-family:Arial,sans-serif;text-transform:uppercase;letter-spacing:.05em}
+    .f-box-label{font-size:9px;color:#444;margin-top:2px;line-height:1.3;font-family:Arial,sans-serif;min-height:28px}
+    .f-box-val{font-size:16px;font-weight:700;margin-top:4px;color:#111;font-family:'Courier New',Courier,monospace}
+    .f-box-main .f-box-val{font-size:22px;color:#1a5a1a}
+    .f-field-label{font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:#777;font-family:Arial,sans-serif;margin-bottom:2px}
+    .f-field-val{font-size:12px;color:#111;font-family:'Courier New',Courier,monospace}
+    .f-ssn{font-size:14px;letter-spacing:.1em}
+    .f-muted{color:#888!important}
+    .f-warn{font-size:9px;color:#b34000;font-family:Arial,sans-serif;margin-top:3px;font-weight:700}
+    .f-disclaimer{padding:8px 12px;font-size:8.5px;color:#555;line-height:1.5;font-family:Arial,sans-serif;background:#f9f9f5;border-top:1px solid #ccc}
+
+    @media print{
+      .no-print{display:none!important}
+      body{padding:8px 12px}
+      .page-break{page-break-before:always;padding-top:16px}
+      thead{display:table-header-group}
+      tr{page-break-inside:avoid}
+      .form1099{border-width:1.5px;page-break-inside:avoid}
+    }
+  </style></head><body>
+  <div class="rpt-header">
+    <div>
+      <div class="rpt-co">Richard Hahn Appraisal LLC</div>
+      <div class="rpt-co-sub">rhappraisal.com</div>
+    </div>
+    <div>
+      <div class="rpt-title">Appraiser Tax Report — ${taxYear}</div>
+      <div class="rpt-sub">Tax Year ${taxYear} &nbsp;·&nbsp; Paid Orders &amp; 1099-NEC Summary &nbsp;·&nbsp; Generated ${dateStr}</div>
+    </div>
+  </div>
+  ${multiAp ? `<div class="grand-summary">
+    <div><div class="gs-label">Tax Year</div><div class="gs-val">${taxYear}</div></div>
+    <div><div class="gs-label">Total Paid Out</div><div class="gs-val">$${grandTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div></div>
+    <div><div class="gs-label">Appraisers</div><div class="gs-val">${apIds.length}</div></div>
+    <div><div class="gs-label">Orders</div><div class="gs-val">${baseOrders.length}</div></div>
+  </div>` : ''}
+  ${sectionsHtml}
+  <div class="no-print">
+    <button class="btn-p primary" onclick="window.print()">🖨 Print / Save as PDF</button>
+    <button class="btn-p secondary" onclick="window.close()">Close</button>
+  </div>
+  </body></html>`);
+  win.document.close();
+}
+
 function printAppraisalPayments() {
   const sel = document.getElementById('ap-pay-appraiser');
   const apLabel = sel ? sel.options[sel.selectedIndex]?.text : 'All Appraisers';
@@ -9014,7 +9341,7 @@ ${'─'.repeat(60)}
 ${lines}
 ${'─'.repeat(60)}
 
-— RH Appraisal`;
+— Richard Hahn Appraisal LLC`;
 
   window.location.href = `mailto:?subject=${encodeURIComponent('Appraiser Payments — '+apLabel)}&body=${encodeURIComponent(body)}`;
 }
@@ -9126,7 +9453,7 @@ ${'─'.repeat(60)}
 ${lines}
 ${'─'.repeat(60)}
 
-— RH Appraisal`;
+— Richard Hahn Appraisal LLC`;
 
   window.location.href = `mailto:?subject=${encodeURIComponent('Invoice Report — '+filterLabel)}&body=${encodeURIComponent(body)}`;
 }
@@ -9723,13 +10050,13 @@ function previewSampleInvoice() {
 
   const invoiceNum = 'INV-SAMPLE';
   const today = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
-  const firmName = firm.name || 'RH Appraisal';
+  const firmName = firm.name || 'Richard Hahn Appraisal LLC';
   const firmContact = firm.contact || 'Richard Hahn, SRA';
   const firmAddress = firm.address || '123 Main St, Brooklyn NY 11201';
   const firmPhone = firm.phone || '(718) 555-0100';
   const firmEmail = firm.email || 'richard@rhappraisal.com';
   const firmLic = firm.license || 'NY Cert Res 12345';
-  const payInstr = firm.payment || 'Make checks payable to RH Appraisal\nMail to: 123 Main St, Brooklyn NY 11201\n\nZelle: richard@rhappraisal.com';
+  const payInstr = firm.payment || 'Make checks payable to Richard Hahn Appraisal LLC\nMail to: 123 Main St, Brooklyn NY 11201\n\nZelle: richard@rhappraisal.com';
 
   let html = '';
   sections.forEach(sec => {
