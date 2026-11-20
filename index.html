@@ -7825,9 +7825,11 @@ function extractOrderData(raw) {
         nhaAddrFilled = true;
       }
     }
-    // Style C: bare inline address anywhere (e.g. "228 Hancock Street, Brooklyn, NY 11216")
+    // Style C: bare inline address — search ONLY in the portion of text before the Lender section
     if (!nhaAddrFilled) {
-      const nhaInlineAddr = text.match(/(\d[\w\s\-\.#]{5,50},\s*[A-Za-z][A-Za-z\s]+,\s*(?:NY|NJ|CT|[A-Z]{2})\s+\d{5})/);
+      const lenderIdx = text.search(/\bLender\s*:/i);
+      const searchArea = lenderIdx > 0 ? text.slice(0, lenderIdx) : text;
+      const nhaInlineAddr = searchArea.match(/(\d[\w\s\-\.#]{5,50},\s*[A-Za-z][A-Za-z\s]+,\s*(?:NY|NJ|CT|[A-Z]{2})\s+\d{5})/);
       if (nhaInlineAddr) setAddressFields(nhaInlineAddr[1].trim());
     }
 
