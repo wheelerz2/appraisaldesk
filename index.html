@@ -2002,7 +2002,7 @@ body.is-admin .admin-only { display: block !important; }
         <div class="spacer"></div>
         <div class="income-export-btns">
           <button class="btn-export" onclick="incomeExportCSV()">&#11015; Export CSV</button>
-          <button class="btn-export" onclick="window.print()">&#128424; Print / PDF</button>
+          <button class="btn-export" onclick="printIncomeReport()">&#128424; Print / PDF</button>
         </div>
       </div>
       <div class="income-sort-bar">
@@ -8342,6 +8342,142 @@ function renderIncome() {
   tbody.innerHTML = html;
 }
 
+function printIncomeReport() {
+  const selAp   = document.getElementById('inc-appraiser')?.value || 'all';
+  const fromDt  = document.getElementById('inc-from')?.value || '';
+  const toDt    = document.getElementById('inc-to')?.value   || '';
+  const sortMode = _incSortMode || 'year';
+  const currYear = String(new Date().getFullYear());
+  const dateStr  = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+
+  const apName = id => {
+    if (!id || id === '__none__') return 'Unassigned';
+    const a = appraisers.find(x => x.id === id);
+    return a ? a.name : 'Unknown';
+  };
+  const fmt = d => { if (!d) return '—'; const [y,m,dy] = d.split('-'); return `${parseInt(m)}/${parseInt(dy)}/${y}`; };
+
+  let list = orders.filter(o => {
+    if (!o.fee) return false;
+    if (selAp !== 'all' && o.appraiserId !== selAp) return false;
+    if (fromDt && o.due && o.due < fromDt) return false;
+    if (toDt   && o.due && o.due > toDt)   return false;
+    if (sortMode === 'curryear' && (!o.due || !o.due.startsWith(currYear))) return false;
+    return true;
+  });
+  list = [...list].sort((a,b) => (b.due||'').localeCompare(a.due||''));
+
+  if (!list.length) { toast('No orders to print'); return; }
+
+  // Summary totals
+  let grandFee = 0, grandEarn = 0;
+  list.forEach(o => {
+    grandFee  += o.fee;
+    grandEarn += Math.round(o.fee * ((o.feeSplit != null ? o.feeSplit : 100) / 100));
+  });
+
+  // Build filter label
+  const apLabel  = selAp === 'all' ? 'All Appraisers' : apName(selAp);
+  const modeLabel = sortMode === 'curryear' ? `Current Year (${currYear})` : sortMode.charAt(0).toUpperCase() + sortMode.slice(1);
+  const dateRange = fromDt || toDt ? ` · ${fromDt||'…'} → ${toDt||'…'}` : '';
+  const subtitle  = `${apLabel} · Grouped by ${modeLabel}${dateRange} · As of ${dateStr}`;
+
+  const summaryHtml = `<div class="summary-row">
+    <div class="summary-tile"><div class="tile-lbl">Orders</div><div class="tile-val">${list.length}</div></div>
+    <div class="summary-tile"><div class="tile-lbl">Gross Fees</div><div class="tile-val">$${grandFee.toLocaleString()}</div></div>
+    <div class="summary-tile good"><div class="tile-lbl">Appraiser Earnings</div><div class="tile-val">$${grandEarn.toLocaleString()}</div></div>
+    <div class="summary-tile warn"><div class="tile-lbl">Firm Retained</div><div class="tile-val">$${(grandFee-grandEarn).toLocaleString()}</div></div>
+  </div>`;
+
+  // Group by period
+  const periodMap = {}, periodOrder = [];
+  list.forEach(o => {
+    const key = _incomePeriodKey(o, sortMode === 'curryear' ? 'month' : sortMode);
+    if (!periodMap[key]) { periodMap[key] = []; periodOrder.push(key); }
+    periodMap[key].push(o);
+  });
+  const seen = new Set();
+  const sortedPeriods = periodOrder.filter(k => { if (seen.has(k)) return false; seen.add(k); return true; });
+
+  let tableHtml = `<table>
+    <thead>
+      <tr>
+        <th colspan="2" style="text-align:center;border-right:1px solid rgba(255,255,255,.3)">DATES</th>
+        <th>Address</th><th>Client</th><th>AMC / Lender</th>
+        <th>Appraiser</th><th class="num">Total Fee</th><th class="num">Split %</th><th class="num">Appraiser $</th>
+      </tr>
+      <tr>
+        <th style="font-weight:500;font-size:9.5px;opacity:.8">Created</th>
+        <th style="font-weight:500;font-size:9.5px;opacity:.8;border-right:1px solid rgba(255,255,255,.3)">Sent</th>
+        <th></th><th></th><th></th><th></th><th></th><th></th><th></th>
+      </tr>
+    </thead><tbody>`;
+
+  sortedPeriods.forEach(periodKey => {
+    const pRows = periodMap[periodKey];
+    const pLabel = _incomePeriodLabel(periodKey, sortMode === 'curryear' ? 'month' : sortMode);
+    let pFee = 0, pEarn = 0;
+    pRows.forEach(o => { pFee += o.fee; pEarn += Math.round(o.fee * ((o.feeSplit!=null?o.feeSplit:100)/100)); });
+
+    tableHtml += `<tr class="income-period-header"><td colspan="9">${pLabel} — ${pRows.length} order${pRows.length!==1?'s':''} · $${pFee.toLocaleString()} gross</td></tr>`;
+
+    // Group by appraiser within period
+    const apGrouped = {};
+    pRows.forEach(o => { const id = o.appraiserId||'__none__'; if(!apGrouped[id])apGrouped[id]=[]; apGrouped[id].push(o); });
+    const apIds = appraisers.map(a=>a.id).filter(id=>apGrouped[id]);
+    if (apGrouped['__none__']) apIds.push('__none__');
+
+    apIds.forEach(apId => {
+      const apRows = apGrouped[apId];
+      const apLbl = apName(apId);
+      let apFee = 0, apEarn = 0;
+      apRows.forEach(o => { apFee += o.fee; apEarn += Math.round(o.fee*((o.feeSplit!=null?o.feeSplit:100)/100)); });
+
+      if (apIds.length > 1) {
+        tableHtml += `<tr class="section-header"><td colspan="9">${apLbl} — ${apRows.length} order${apRows.length!==1?'s':''}</td></tr>`;
+      }
+
+      apRows.forEach(o => {
+        const split = o.feeSplit != null ? o.feeSplit : 100;
+        const earn  = Math.round(o.fee * split / 100);
+        tableHtml += `<tr>
+          <td style="white-space:nowrap">${o.created ? fmt(o.created.slice(0,10)) : '—'}</td>
+          <td style="white-space:nowrap;border-right:1px solid #e5e7eb">${o.orderSent ? fmt(o.orderSent) : '—'}</td>
+          <td>${o.address ? o.address.split(',')[0] : '—'}</td>
+          <td>${o.client||'—'}</td>
+          <td>${o.amc||o.lender||'—'}</td>
+          <td>${apLbl}</td>
+          <td class="num">$${o.fee.toLocaleString()}</td>
+          <td class="num">${split}%</td>
+          <td class="num">$${earn.toLocaleString()}</td>
+        </tr>`;
+      });
+
+      if (apIds.length > 1) {
+        tableHtml += `<tr class="total-row">
+          <td colspan="6" style="text-align:right">Subtotal — ${apLbl}</td>
+          <td class="num">$${apFee.toLocaleString()}</td><td class="num"></td>
+          <td class="num">$${apEarn.toLocaleString()}</td>
+        </tr>`;
+      }
+    });
+
+    tableHtml += `<tr class="total-row" style="border-top:2px solid #c0cad8">
+      <td colspan="6" style="text-align:right;font-weight:700">${pLabel} Total</td>
+      <td class="num" style="font-weight:700">$${pFee.toLocaleString()}</td><td class="num"></td>
+      <td class="num" style="font-weight:700">$${pEarn.toLocaleString()}</td>
+    </tr>`;
+  });
+
+  tableHtml += `<tr class="grand-total">
+    <td colspan="6" style="text-align:right">Grand Total</td>
+    <td class="num">$${grandFee.toLocaleString()}</td><td class="num"></td>
+    <td class="num">$${grandEarn.toLocaleString()}</td>
+  </tr></tbody></table>`;
+
+  _buildPrintWindow('Income Report', subtitle, tableHtml, summaryHtml);
+}
+
 function incomeExportCSV() {
   const selAp  = document.getElementById('inc-appraiser')?.value || 'all';
   const fromDt = document.getElementById('inc-from')?.value || '';
@@ -8675,7 +8811,22 @@ function _buildPrintWindow(title, subtitle, tableHtml, summaryHtml) {
     .btn-p.primary{background:#1a3a4a;color:#fff}
     .btn-p.secondary{background:#f0f4f8;color:#1a3a4a;border:1px solid #c0cad8}
     .footer-note{margin-top:24px;font-size:10px;color:#aaa;border-top:1px solid #e5e7eb;padding-top:8px}
-    @media print{.no-print{display:none!important}body{padding:16px 20px}}
+    .income-period-header td{background:#1a3a4a;color:#fff;font-weight:700;font-size:11px;padding:6px 10px;letter-spacing:.04em}
+    .section-header td{background:#e8edf2;color:#1a3a4a;font-weight:700;font-size:10.5px;padding:5px 10px}
+    .total-row td{background:#f0f4f8;font-weight:700;font-size:11px;padding:6px 10px;border-top:1px solid #c0cad8}
+    .grand-total td{background:#1a3a4a;color:#fff;font-weight:700;font-size:12px;padding:7px 10px}
+    .grand-total td.num{text-align:right}
+    @media print{
+      .no-print{display:none!important}
+      body{padding:12px 16px;font-size:10px}
+      thead th{font-size:9.5px;padding:5px 7px}
+      td{font-size:10px;padding:4px 7px}
+      table{page-break-inside:auto}
+      tr{page-break-inside:avoid}
+      thead{display:table-header-group}
+      .income-period-header{page-break-before:auto}
+      .summary-row{margin-bottom:10px}
+    }
   </style></head><body>
   <div class="rpt-header">
     <div>
@@ -8694,7 +8845,11 @@ function _buildPrintWindow(title, subtitle, tableHtml, summaryHtml) {
     <button class="btn-p primary" onclick="window.print()">🖨 Print / Save as PDF</button>
     <button class="btn-p secondary" onclick="window.close()">Close</button>
   </div>
-  
+  </body></html>`);
+  win.document.close();
+  return win;
+}
+
 <!-- ══ LOGIN OVERLAY ══ -->
 <div id="login-overlay" style="display:none;position:fixed;inset:0;background:var(--paper);z-index:99999;align-items:center;justify-content:center">
   <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.12)">
@@ -8762,11 +8917,6 @@ function _buildPrintWindow(title, subtitle, tableHtml, summaryHtml) {
     </div>
   </div>
 </div>
-
-</body></html>`);
-  win.document.close();
-  return win;
-}
 
 function printAppraisalPayments() {
   const sel = document.getElementById('ap-pay-appraiser');
