@@ -2010,6 +2010,7 @@ body.is-admin .admin-only { display: block !important; }
         <button id="inc-sort-year"    class="inc-sort-btn active" onclick="setIncomeSort('year')">Year</button>
         <button id="inc-sort-quarter" class="inc-sort-btn"        onclick="setIncomeSort('quarter')">Quarter</button>
         <button id="inc-sort-month"   class="inc-sort-btn"        onclick="setIncomeSort('month')">Month</button>
+        <button id="inc-sort-curryear" class="inc-sort-btn"       onclick="setIncomeSort('curryear')">Current Year</button>
       </div>
       <div class="income-summary-grid" id="income-tiles"></div>
       <div class="income-table-wrap">
@@ -8144,7 +8145,7 @@ function applyAppraiserSplit(appraiserId) {
 let _incSortMode = 'year';
 function setIncomeSort(mode) {
   _incSortMode = mode;
-  ['year','quarter','month'].forEach(m => {
+  ['year','quarter','month','curryear'].forEach(m => {
     const btn = document.getElementById('inc-sort-' + m);
     if (btn) btn.classList.toggle('active', m === mode);
   });
@@ -8161,13 +8162,13 @@ function _incomePeriodKey(o, mode) {
     const q = Math.floor(d.getMonth() / 3) + 1;
     return `${yr} Q${q}`;
   }
-  // month
+  // month or curryear (both group by month)
   return dt.slice(0, 7); // "YYYY-MM"
 }
 
 function _incomePeriodLabel(key, mode) {
   if (mode === 'year' || mode === 'quarter' || key === 'Unknown') return key;
-  // "YYYY-MM" → "Month YYYY"
+  // "YYYY-MM" → "Month YYYY" (used for month and curryear modes)
   const [yr, mo] = key.split('-');
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   return `${months[parseInt(mo, 10) - 1]} ${yr}`;
@@ -8187,6 +8188,7 @@ function renderIncome() {
   const fromDt = document.getElementById('inc-from')?.value || '';
   const toDt   = document.getElementById('inc-to')?.value   || '';
   const sortMode = _incSortMode || 'year';
+  const currYear = String(new Date().getFullYear());
 
   // Filter orders: must have a fee, and be complete (or any status — include all for income log)
   let list = orders.filter(o => {
@@ -8195,11 +8197,13 @@ function renderIncome() {
     // Date filter uses due date
     if (fromDt && o.due && o.due < fromDt) return false;
     if (toDt   && o.due && o.due > toDt)   return false;
+    // Current Year filter
+    if (sortMode === 'curryear' && (!o.due || !o.due.startsWith(currYear))) return false;
     return true;
   });
 
-  // Sort by due date
-  list = [...list].sort((a,b) => (a.due||'').localeCompare(b.due||''));
+  // Sort by due date — newest first
+  list = [...list].sort((a,b) => (b.due||'').localeCompare(a.due||''));
 
   // Compute per-appraiser totals
   const apTotals = {};
@@ -8256,7 +8260,7 @@ function renderIncome() {
     if (!periodMap[key]) { periodMap[key] = []; periodOrder.push(key); }
     periodMap[key].push(o);
   });
-  // Keep chronological order (already sorted above); dedupe
+  // Dedupe period keys; list is newest-first so periodOrder is already newest-first
   const seenKeys = new Set();
   const sortedPeriods = periodOrder.filter(k => { if (seenKeys.has(k)) return false; seenKeys.add(k); return true; });
 
