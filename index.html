@@ -6385,12 +6385,14 @@ function handleUploadFile(file) {
                 const isTwoCol = twoColRows.length > rows.length * 0.25;
 
                 if (isTwoCol) {
-                  // Two-column mode: emit left then right each on own line
+                  // Two-column mode: emit left + right on ONE line separated by spaces
+                  // (mimics pdftotext -layout so label:value pairs stay on same line)
                   for (const row of rows) {
                     const left  = row.items.filter(it => it.x < pageMid).sort((a,b)=>a.x-b.x).map(it=>it.str).join(' ').trim();
                     const right = row.items.filter(it => it.x >= pageMid).sort((a,b)=>a.x-b.x).map(it=>it.str).join(' ').trim();
-                    if (left)  allText += left  + '\n';
-                    if (right) allText += right + '\n';
+                    if (left && right) allText += left + '   ' + right + '\n';
+                    else if (left)     allText += left  + '\n';
+                    else if (right)    allText += right + '\n';
                   }
                 } else {
                   // Single-column: standard Y-grouped extraction
