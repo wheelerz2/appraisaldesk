@@ -6445,15 +6445,18 @@ function handleUploadFile(file) {
           return;
         }
 
-        // Debug: show the first 2000 chars of extracted text so we can diagnose
         console.log('=== PDF EXTRACTED TEXT ===\n' + allText.slice(0, 3000));
-        // Also surface it visually via the sub-label for 5 seconds
-        const subEl = document.getElementById('upload-sub');
-        if (subEl) {
-          const preview = allText.slice(0, 200).replace(/\n/g, ' ↵ ');
-          subEl.textContent = '📋 Text found: ' + preview + (allText.length > 200 ? '…' : '');
-          subEl.style.fontSize = '10px';
-        }
+
+        // Show a "Copy Raw Text" button so we can debug what the browser extracted
+        const dbgBtn = document.getElementById('debug-raw-btn') || document.createElement('button');
+        dbgBtn.id = 'debug-raw-btn';
+        dbgBtn.textContent = '📋 Copy Raw Text (debug)';
+        dbgBtn.style.cssText = 'margin:6px 0;padding:4px 10px;font-size:11px;background:#f0f0f0;border:1px solid #aaa;border-radius:4px;cursor:pointer;';
+        dbgBtn.onclick = () => {
+          navigator.clipboard.writeText(allText.slice(0, 3000)).then(() => alert('Copied! Paste it to Claude.'));
+        };
+        const uploadArea = document.getElementById('upload-area') || document.getElementById('pdf-drop');
+        if (uploadArea && !document.getElementById('debug-raw-btn')) uploadArea.parentNode.insertBefore(dbgBtn, uploadArea.nextSibling);
 
         const count = extractOrderData(allText);
         autoSaveExtractedCompany('lender');
