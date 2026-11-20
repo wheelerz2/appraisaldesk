@@ -7076,10 +7076,8 @@ function extractOrderData(raw) {
       return nextLineVal(label);
     }
 
-    // AMC
-    const alCoLine = inlineOrNext('Company:');
-    if (alCoLine && /appraisal\s*links/i.test(alCoLine)) trySet('f-amc', alCoLine);
-    else trySet('f-amc', 'Appraisal Links, Inc.');
+    // AMC — always Appraisal Links (the "Company:" field contains the appraiser's own company name)
+    trySet('f-amc', 'Appraisal Links, Inc.');
 
     // Lender: "Client displayed on report:" or plain "Client:" → value on same or next line
     const alLenderVal = inlineOrNext('Client displayed on report:') || inlineOrNext('Client:');
@@ -7162,9 +7160,9 @@ function extractOrderData(raw) {
       }
     }
 
-    // Entry Contact → contact name (borrower entry contact / inspector)
-    const alEntryContact = inlineOrNext('Entry\\s+Contact:');
-    if (alEntryContact && !/N\/A/i.test(alEntryContact)) trySet('f-insp-contact', alEntryContact);
+    // Entry Contact → contact name (always on the NEXT line; inline is the right-column address)
+    const alEntryContact = nextLineVal('Entry\\s+Contact:');
+    if (alEntryContact && !/N\/A|Map\s+Link/i.test(alEntryContact)) trySet('f-insp-contact', alEntryContact);
 
     // Fee: "Total Appraiser Fee: $900.00" OR "Service Fee: $400.00"
     const alFeeInline = text.match(/Total\s+Appraiser\s+Fee:\s*\$?([\d,]+(?:\.\d{2})?)/i)
@@ -7180,7 +7178,7 @@ function extractOrderData(raw) {
     }
 
     // Due Date: "Due Date: 11/02/2026" OR "Due: 11/30/2026"
-    const alDueInline = text.match(/Due\s+(?:Date)?:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
+    const alDueInline = text.match(/Due\s*(?:Date\s*)?:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
     if (alDueInline) {
       trySet('f-due', normalizeDate(alDueInline[1]));
     } else {
@@ -7213,6 +7211,10 @@ function extractOrderData(raw) {
     // AMC Order ID — "File #: AL-363050"  or  "File ID: JL-143670"
     const alFileM = text.match(/File\s+(?:#|ID)\s*[:\-]?\s*([\w\-]{3,20})/i);
     if (alFileM && !/N\/A/i.test(alFileM[1])) trySet('f-amcid', alFileM[1].trim());
+
+    // Order / Assigned date — "Assigned: 11/20/2026 10:01 PM"
+    const alAssignedM = text.match(/Assigned\s*:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
+    if (alAssignedM) trySet('f-order-date', normalizeDate(alAssignedM[1]));
 
     return filled;
   }
