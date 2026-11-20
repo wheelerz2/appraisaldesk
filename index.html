@@ -7081,27 +7081,27 @@ function extractOrderData(raw) {
     if (alCoLine && /appraisal\s*links/i.test(alCoLine)) trySet('f-amc', alCoLine);
     else trySet('f-amc', 'Appraisal Links, Inc.');
 
-    // Lender: "Client displayed on report:" label → value on same or next line
-    const alLenderVal = inlineOrNext('Client displayed on report:');
+    // Lender: "Client displayed on report:" or plain "Client:" → value on same or next line
+    const alLenderVal = inlineOrNext('Client displayed on report:') || inlineOrNext('Client:');
     if (alLenderVal) trySet('f-lender', alLenderVal);
 
-    // Address: "Address 1:" label then value on next line (may be on same line after dedup)
-    // Pattern: "Address 1:  4916 66Th St" OR label alone then value next line
+    // Address: two styles:
+    // Style A — structured fields: "Address 1:", "City:", "State:", "Zip Code:"
+    // Style B — single inline line: "355D Dormans Court, Far Rockaway, New York, 11693"
+    //   (appears in the right column of the JARO/Appraisal Links layout)
+    let alAddrFilled = false;
+
+    // Style A: structured fields
     const alAddr1m = text.match(/Address\s*1:\s*([^\n\r]{4,60})/i);
     let alAddr1 = alAddr1m ? alAddr1m[1].trim() : '';
-    // If the inline value looks empty or like "Address2:", get next line
     if (!alAddr1 || /Address2|N\/A/i.test(alAddr1)) alAddr1 = nextLineVal('Address\\s*1:');
-    // Strip trailing "Address2:" label that bleeds in
     alAddr1 = alAddr1.replace(/\s*Address2.*$/i, '').trim();
 
-    // City/State/Zip — may be inline or next line
     const alCityM = text.match(/City:\s*([A-Za-z][^\n\r]{2,30})/i);
     let alCity = alCityM ? alCityM[1].replace(/State:.*/i,'').trim() : '';
     if (!alCity) alCity = nextLineVal('City:').replace(/State:.*/i,'').trim();
-
     const alStateM = text.match(/State:\s*([A-Z]{2})/i);
     const alState = alStateM ? alStateM[1] : (nextLineVal('State:').slice(0,2) || '');
-
     const alZipM = text.match(/Zip\s+Code:\s*(\d{5})/i);
     const alZip = alZipM ? alZipM[1] : (nextLineVal('Zip\\s+Code:').match(/\d{5}/)||[''])[0];
 
@@ -7110,19 +7110,25 @@ function extractOrderData(raw) {
       if (alState) addrParts.push(alState);
       if (alZip)  addrParts.push(alZip);
       setAddressFields(addrParts.join(', '));
+      alAddrFilled = true;
     }
 
-    // Borrower: label on one line, name on next line
-    // "Borrower:  Phone#" then "Antonio Ambrosino  N/A"
+    // Style B: comma-separated inline line ending with ZIP (e.g. "355D Dormans Court, Far Rockaway, New York, 11693")
+    if (!alAddrFilled) {
+      const alInlineAddr = text.match(/(\d[\w\s\-\.,#]{8,60},\s*[A-Za-z][A-Za-z\s]+,\s*(?:New York|NY|New Jersey|NJ|Connecticut|CT|[A-Z]{2}),?\s*\d{5})/i);
+      if (alInlineAddr) { setAddressFields(alInlineAddr[1].trim()); alAddrFilled = true; }
+    }
+
+    // Borrower: label on one line, name inline or on next line
+    // Style A: "Borrower:  Phone#" then "Antonio Ambrosino  N/A"
+    // Style B: "Borrower:\nAllison Sampson"
     const alBorrSection = text.match(/Borrower:\s*([^\n\r]*)\n\s*([^\n\r]{2,60})/i);
     let alBorrName = '';
     if (alBorrSection) {
-      // If value is inline (same line, not just "Phone#")
       const inline = alBorrSection[1].trim();
       if (inline && !/^(?:Phone#?|Work#?|Cell#?|N\/A)$/i.test(inline)) {
         alBorrName = inline;
       } else {
-        // Take first word-group from next line (before any N/A or phone#)
         const nextLine = alBorrSection[2].trim();
         const namePart = nextLine.split(/\s{2,}|\t/)[0].trim();
         if (namePart && !/^N\/A$/i.test(namePart) && /[A-Za-z]/.test(namePart)) alBorrName = namePart;
@@ -7130,18 +7136,17 @@ function extractOrderData(raw) {
     }
     if (alBorrName) setBorrowerFields([alBorrName]);
 
-    // Cell phone: "Work#:  Cell#" label row → "N/A  718-938-7476" value row
-    // Try direct inline first, then parse from value row after "Work#" / "Cell#" labels
-    const alCellInline = text.match(/Cell\s*#?\s*[\n\r]+\s*([\(\d][\d\s\-\.\(\)]{7,18})/i)
+    // Phone: several styles:
+    // "Mobile: (917) 686-3593"  /  "Cell#: 718-938-7476"  /  two-col "Work#  Cell#" row
+    const alMobileInline = text.match(/Mobile\s*:?\s*([\(\d][\d\s\-\.\(\)]{7,18})/i)
+      || text.match(/Cell\s*#?\s*[\n\r]+\s*([\(\d][\d\s\-\.\(\)]{7,18})/i)
       || text.match(/Cell\s*#?:?\s*([\(\d][\d\s\-\.\(\)]{7,18})/i);
-    if (alCellInline) {
-      trySet('f-phone', alCellInline[1].trim());
+    if (alMobileInline) {
+      trySet('f-phone', alMobileInline[1].trim());
     } else {
-      // Parse "Work#:  Cell#" row then value row: "N/A  718-938-7476"
       const workCellRow = text.match(/Work#[^\n]*Cell#[^\n]*\n\s*([^\n\r]{2,60})/i);
       if (workCellRow) {
         const parts = workCellRow[1].trim().split(/\s{2,}|\t/);
-        // parts[0] = Work# value (N/A), parts[1] = Cell# value (718-938-7476)
         const cellVal = parts[1] || parts[0] || '';
         const phoneMatch = cellVal.match(/([\(\d][\d\s\-\.\(\)]{7,18})/);
         if (phoneMatch) trySet('f-phone', phoneMatch[1].trim());
@@ -7157,9 +7162,13 @@ function extractOrderData(raw) {
       }
     }
 
-    // Fee: "Total Appraiser Fee:  Due Date:" labels row → "$900.00  11/02/2026" values row
-    // Try inline first, then next-line two-column parse
-    const alFeeInline = text.match(/Total\s+Appraiser\s+Fee:\s*\$?([\d,]+(?:\.\d{2})?)/i);
+    // Entry Contact → contact name (borrower entry contact / inspector)
+    const alEntryContact = inlineOrNext('Entry\\s+Contact:');
+    if (alEntryContact && !/N\/A/i.test(alEntryContact)) trySet('f-insp-contact', alEntryContact);
+
+    // Fee: "Total Appraiser Fee: $900.00" OR "Service Fee: $400.00"
+    const alFeeInline = text.match(/Total\s+Appraiser\s+Fee:\s*\$?([\d,]+(?:\.\d{2})?)/i)
+      || text.match(/Service\s+Fee:\s*\$?([\d,]+(?:\.\d{2})?)/i);
     if (alFeeInline) {
       trySet('f-fee', alFeeInline[1].replace(/,/g,''));
     } else {
@@ -7170,8 +7179,8 @@ function extractOrderData(raw) {
       }
     }
 
-    // Due Date: may be inline OR in the two-column row with fee
-    const alDueInline = text.match(/Due\s+Date:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
+    // Due Date: "Due Date: 11/02/2026" OR "Due: 11/30/2026"
+    const alDueInline = text.match(/Due\s+(?:Date)?:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
     if (alDueInline) {
       trySet('f-due', normalizeDate(alDueInline[1]));
     } else {
@@ -7179,7 +7188,6 @@ function extractOrderData(raw) {
       const feeDueRow = text.match(/Total\s+Appraiser\s+Fee:[^\n]*Due\s+Date:[^\n]*\n\s*([^\n\r]{5,60})/i);
       if (feeDueRow) {
         const parts = feeDueRow[1].trim().split(/\s{2,}|\t/);
-        // parts[0]=fee, parts[1]=due date
         const datePart = (parts[1] || '').match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
         if (datePart) trySet('f-due', normalizeDate(datePart[1]));
       }
@@ -7189,21 +7197,21 @@ function extractOrderData(raw) {
     const alIntended = inlineOrNext('Intended\\s+Use:');
     if (alIntended) trySet('f-purpose', normalizePurpose(alIntended));
 
-    // Form type from JobType (next-line after label)
-    // e.g. "3.6 UAD Jumbo Conv Condo Traditional w/Rental" → 3.6
-    const alJobTypeLine = inlineOrNext('JobType:');
+    // Form type from JobType, Form:, or Property Types:
+    // e.g. "3.6 UAD Jumbo Conv Condo Traditional w/Rental"  or  "Conventional 1004 - SFR"
+    const alJobTypeLine = inlineOrNext('JobType:') || inlineOrNext('Form:');
     if (alJobTypeLine) { const fType = detectFormType(alJobTypeLine); if (fType) trySet('f-type', fType); }
     if (!document.getElementById('f-type').value) {
       const alPropType = inlineOrNext('Property\\s+Types?:');
       if (alPropType) { const fType = detectFormType(alPropType); if (fType) trySet('f-type', fType); }
     }
 
-    // Loan # — "Loan #: 1034001121999"
+    // Loan # — "Loan #: 1034001121999"  or  "Loan #: RNN0000051123"
     const alLoanM = text.match(/Loan\s*#\s*[:\-]?\s*([\w\-]{4,30})/i);
     if (alLoanM && !/N\/A/i.test(alLoanM[1])) trySet('f-loannum', alLoanM[1].trim());
 
-    // AMC Order ID — "File #: AL-363050"
-    const alFileM = text.match(/File\s*#\s*[:\-]?\s*([\w\-]{3,20})/i);
+    // AMC Order ID — "File #: AL-363050"  or  "File ID: JL-143670"
+    const alFileM = text.match(/File\s+(?:#|ID)\s*[:\-]?\s*([\w\-]{3,20})/i);
     if (alFileM && !/N\/A/i.test(alFileM[1])) trySet('f-amcid', alFileM[1].trim());
 
     return filled;
@@ -7746,6 +7754,134 @@ function extractOrderData(raw) {
     if (accessM) {
       trySet('f-contact-name',  accessM[1].trim());
       trySet('f-contact-phone', accessM[2].trim());
+    }
+
+    return filled;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  // NORMAN HUBBARD & ASSOCIATES (NHA)
+  // Detection: "NEW APPRAISAL ORDER" header + Norman Hubbard / NHAUDS / NHA phone
+  // Generated by Microsoft Reporting Services 2019 — clean pdftotext output
+  // ════════════════════════════════════════════════════════════════════════
+  const isNHA = /NEW\s+APPRAISAL\s+ORDER/i.test(text) &&
+    (/Norman\s+Hubbard|NHAUDS|914-997-1484/i.test(text) ||
+     (/FILE\s+NUMBER\s*:/i.test(text) && /Microsoft\s+Reporting\s+Services/i.test(text)));
+
+  if (isNHA) {
+    // Helper: grab first value on same line after a label
+    const nhaField = (label) => {
+      const m = text.match(new RegExp(label + '[:\\s]+([^\\n\\r]+)', 'i'));
+      return m ? m[1].trim() : '';
+    };
+
+    // ── AMC = Norman Hubbard & Associates ────────────────────────────────
+    trySet('f-amc', 'Norman Hubbard & Associates');
+
+    // ── File Number → AMC order ID ───────────────────────────────────────
+    const nhaFile = nhaField('FILE\\s+NUMBER');
+    if (nhaFile) trySet('f-amcid', nhaFile);
+
+    // ── Borrower: "Last, First" → "First Last" ───────────────────────────
+    const nhaBorrower = nhaField('Borrower');
+    if (nhaBorrower) {
+      const commaIdx = nhaBorrower.indexOf(',');
+      let borrowerName = nhaBorrower;
+      if (commaIdx > 0) {
+        const last  = nhaBorrower.slice(0, commaIdx).trim();
+        const first = nhaBorrower.slice(commaIdx + 1).trim();
+        borrowerName = first ? first + ' ' + last : last;
+      }
+      setBorrowerFields([borrowerName]);
+    }
+
+    // ── Property Address ──────────────────────────────────────────────────
+    // "Property  Address:  228 Hancock Street" then next line "Brooklyn, NY 11216"
+    const nhaAddrM = text.match(/Property\s+Address\s*:\s*([^\n\r]+)/i);
+    if (nhaAddrM) {
+      const addrLine1 = nhaAddrM[1].trim();
+      const afterAddr = text.slice(text.indexOf(nhaAddrM[0]) + nhaAddrM[0].length);
+      const cityLineM = afterAddr.match(/^\s*\n\s*([^\n\r]+)/);
+      const addrFull = cityLineM ? addrLine1 + ', ' + cityLineM[1].trim() : addrLine1;
+      setAddressFields(addrFull);
+    }
+
+    // ── Order Type → form type ────────────────────────────────────────────
+    const nhaOrderType = nhaField('Order\\s+Type');
+    if (nhaOrderType) {
+      const fType = detectFormType(nhaOrderType) || detectFormType(text);
+      if (fType) trySet('f-type', fType);
+    }
+
+    // ── Loan ID ───────────────────────────────────────────────────────────
+    const nhaLoanM = text.match(/Loan\s+ID\s*#?\s*[:\-]?\s*([\w\d]+)/i);
+    if (nhaLoanM) trySet('f-loannum', nhaLoanM[1].trim());
+
+    // ── Loan Purpose ──────────────────────────────────────────────────────
+    const nhaLoanPurpose = nhaField('Loan\\s+Purpose');
+    if (nhaLoanPurpose) trySet('f-purpose', normalizePurpose(nhaLoanPurpose));
+
+    // ── Client (actual lender using NHA) → Lender field ──────────────────
+    const nhaClient = nhaField('Client');
+    if (nhaClient) trySet('f-lender', nhaClient);
+
+    // ── Lender field (may differ from Client) ────────────────────────────
+    const nhaLenderName = nhaField('Lender');
+    if (nhaLenderName && !/address/i.test(nhaLenderName)) {
+      trySet('f-lender', nhaLenderName);
+      const nhaLenderAddr = nhaField('Lender\\s+Address');
+      if (nhaLenderAddr) {
+        const laM = nhaLenderAddr.match(/^(.*?),\s*([A-Za-z][A-Za-z\s]+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+        if (laM) {
+          trySet('f-lender-street', laM[1].trim());
+          trySet('f-lender-city',   laM[2].trim());
+          trySet('f-lender-state',  laM[3].trim());
+          trySet('f-lender-zip',    laM[4].trim());
+        } else {
+          trySet('f-lender-street', nhaLenderAddr);
+        }
+      }
+    }
+
+    // ── Fee ───────────────────────────────────────────────────────────────
+    const nhaFeeM = text.match(/Your\s+Fee\s*:\s*\$?([\d,]+(?:\.\d{2})?)/i);
+    if (nhaFeeM) {
+      const feeNum = nhaFeeM[1].replace(/,/g, '');
+      if (feeNum) trySet('f-fee', feeNum);
+    }
+
+    // ── Contact name + phone ──────────────────────────────────────────────
+    const nhaContact = nhaField('Contact');
+    if (nhaContact && !/nhauds|hubbard|appraisal/i.test(nhaContact)) {
+      trySet('f-insp-contact', nhaContact);
+    }
+    const nhaPhoneM = text.match(/Phone\s*#?\s*[:\-]?\s*((?:\(?\d{3}\)?[\s\-\.]?\d{3}[\s\-\.]\d{4}))/i);
+    if (nhaPhoneM) trySet('f-phone', nhaPhoneM[1].trim());
+
+    // ── Email (skip NHA's own addresses) ─────────────────────────────────
+    const nhaEmailsAll = [...text.matchAll(/([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/g)].map(m => m[1]);
+    const nhaClientEmail = nhaEmailsAll.find(e => !/nhauds|rhappraisal|hubbard/i.test(e));
+    if (nhaClientEmail) trySet('f-email', nhaClientEmail);
+
+    // ── Order / Assigned date ─────────────────────────────────────────────
+    const nhaAssigned = text.match(/ASSIGNED\s*:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
+    if (nhaAssigned) trySet('f-order-date', normalizeDate(nhaAssigned[1]));
+
+    // ── Due date: "Due date- 11/25" (may omit year) ──────────────────────
+    const nhaDueM = text.match(/Due\s+date[-–\s]+(\d{1,2}\/\d{1,2})(?:\/(\d{4}|\d{2}))?/i);
+    if (nhaDueM) {
+      if (nhaDueM[2]) {
+        const yr = nhaDueM[2].length === 2 ? '20' + nhaDueM[2] : nhaDueM[2];
+        trySet('f-due', normalizeDate(nhaDueM[1] + '/' + yr));
+      } else {
+        const baseYear = nhaAssigned
+          ? nhaAssigned[1].split('/')[2]
+          : String(new Date().getFullYear());
+        const [dueMo] = nhaDueM[1].split('/').map(Number);
+        const orderMo = nhaAssigned ? Number(nhaAssigned[1].split('/')[0]) : dueMo;
+        const dueYear = dueMo < orderMo ? String(Number(baseYear) + 1) : baseYear;
+        trySet('f-due', normalizeDate(nhaDueM[1] + '/' + dueYear));
+      }
     }
 
     return filled;
