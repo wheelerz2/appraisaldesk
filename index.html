@@ -7134,19 +7134,22 @@ function extractOrderData(raw) {
       }
     }
 
-    // Borrower: label on one line, name inline or on next line
-    // Style A: "Borrower:  Phone#" then "Antonio Ambrosino  N/A"
-    // Style B: "Borrower:\nAllison Sampson"
-    const alBorrSection = text.match(/Borrower:\s*([^\n\r]*)\n\s*([^\n\r]{2,60})/i);
+    // Borrower: label on one line, name on next line
+    // "Borrower:\nAllison Sampson\nMap Link"  or  "Borrower:  Phone#\nAntonio Ambrosino  N/A"
+    const alBorrSection = text.match(/Borrower:\s*([^\n\r]*)\n\s*([^\n\r]{2,80})/i);
     let alBorrName = '';
     if (alBorrSection) {
       const inline = alBorrSection[1].trim();
-      if (inline && !/^(?:Phone#?|Work#?|Cell#?|N\/A)$/i.test(inline)) {
-        alBorrName = inline;
+      if (inline && !/^(?:Phone#?|Work#?|Cell#?|N\/A|Map\s+Link)$/i.test(inline)) {
+        // name is inline (old two-col format)
+        alBorrName = inline.split(/\s{2,}/)[0].trim();
       } else {
+        // name is on next line; strip right-col junk (Map Link, N/A, etc.)
         const nextLine = alBorrSection[2].trim();
-        const namePart = nextLine.split(/\s{2,}|\t/)[0].trim();
-        if (namePart && !/^N\/A$/i.test(namePart) && /[A-Za-z]/.test(namePart)) alBorrName = namePart;
+        const namePart = nextLine.split(/\s{2,}|\t/)[0]           // strip right column
+                                 .replace(/\s+Map\s+Link.*$/i,'') // strip "Map Link" if no separator
+                                 .trim();
+        if (namePart && !/^(?:N\/A|Map\s+Link)$/i.test(namePart) && /[A-Za-z]/.test(namePart)) alBorrName = namePart;
       }
     }
     if (alBorrName) setBorrowerFields([alBorrName]);
@@ -7177,20 +7180,26 @@ function extractOrderData(raw) {
       }
     }
 
-    // Entry Contact → contact name (next non-address line after label)
-    // pdftotext: label and address share a line; name is on the next line
-    // PDF.js:    label on own line, address on next, then name on the line after that
+    // Entry Contact → contact name
+    // Browser: "Entry Contact: 355D Dormans Court, Far Rockaway, New York, 11693\nAnthony Farina Queens County"
+    // The name line has county glued on with a single space — strip everything after last word-word boundary
+    // that precedes a county/state word.
     {
       const ecIdx = text.search(/Entry\s+Contact:/i);
       if (ecIdx >= 0) {
         const afterLabel = text.slice(ecIdx);
-        // Walk lines after label; skip address-looking lines (start with digit or contain county/map)
-        const ecLines = afterLabel.split('\n').slice(1);
+        const ecLines = afterLabel.split('\n').slice(1); // skip the label line (which has the address)
         let ecName = '';
         for (const ln of ecLines) {
-          const t = ln.split(/\s{2,}/)[0].trim(); // left column only
+          let t = ln.trim();
           if (!t) continue;
-          if (/^\d|Map\s+Link|Queens|Kings|Bronx|Richmond|New York|County|N\/A/i.test(t)) continue;
+          // Skip lines that ARE the address (start with digit)
+          if (/^\d/.test(t)) continue;
+          // Strip trailing county/state junk glued on with single space: "Anthony Farina Queens County"
+          t = t.replace(/\s+(?:Queens|Kings|Bronx|Richmond|New York|Nassau|Suffolk|Westchester|Bergen|Essex|Hudson|Middlesex|Monmouth|Morris|Union|Fairfield|Hartford|New Haven)\s+County\s*$/i, '')
+               .replace(/\s+(?:Queens|Kings|Bronx|Richmond)\s*$/i, '')
+               .trim();
+          if (!t || /^(?:N\/A|Map\s+Link)$/i.test(t)) continue;
           if (/[A-Za-z]{2,}/.test(t)) { ecName = t; break; }
         }
         if (ecName) trySet('f-insp-contact', ecName);
