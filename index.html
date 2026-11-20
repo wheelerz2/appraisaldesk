@@ -3095,12 +3095,15 @@ function _ensureLoginOverlay() {
       <form id="login-form" action="javascript:void(0)" onsubmit="doLogin()" style="display:flex;flex-direction:column;gap:14px">
         <div>
           <label style="font-size:12px;font-weight:600;color:var(--steel);display:block;margin-bottom:5px">Email</label>
-          <input id="login-email" type="email" name="email" placeholder="you@example.com" autocomplete="username"
+          <input id="login-email" type="email" name="email" placeholder="you@example.com"
+            autocomplete="email username"
+            inputmode="email" spellcheck="false" autocapitalize="none" autocorrect="off"
             style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink)">
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:var(--steel);display:block;margin-bottom:5px">Password</label>
-          <input id="login-password" type="password" name="password" placeholder="••••••••" autocomplete="current-password"
+          <input id="login-password" type="password" name="password" placeholder="••••••••"
+            autocomplete="current-password"
             style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink)">
         </div>
         <div id="login-error" style="display:none;font-size:12px;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px"></div>
@@ -8885,25 +8888,28 @@ function _buildPrintWindow(title, subtitle, tableHtml, summaryHtml) {
       <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--accent);line-height:1">Appraisal<span style="color:var(--ink)">Desk</span></div>
       <div style="font-size:13px;color:var(--muted);margin-top:6px">Sign in to continue</div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:14px">
+    <form id="login-form-static" action="javascript:void(0)" onsubmit="doLogin()" style="display:flex;flex-direction:column;gap:14px">
       <div>
         <label style="font-size:12px;font-weight:600;color:var(--steel);display:block;margin-bottom:5px">Email</label>
-        <input id="login-email" type="email" placeholder="you@example.com" autocomplete="email"
+        <input id="login-email" type="email" name="email" placeholder="you@example.com"
+          autocomplete="email username"
+          inputmode="email" spellcheck="false" autocapitalize="none" autocorrect="off"
           style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink)"
           onkeydown="if(event.key==='Enter')document.getElementById('login-password').focus()">
       </div>
       <div>
         <label style="font-size:12px;font-weight:600;color:var(--steel);display:block;margin-bottom:5px">Password</label>
-        <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password"
+        <input id="login-password" type="password" name="password" placeholder="••••••••"
+          autocomplete="current-password"
           style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink)"
           onkeydown="if(event.key==='Enter')doLogin()">
       </div>
       <div id="login-error" style="display:none;font-size:12px;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px"></div>
-      <button onclick="doLogin()" id="login-btn"
+      <button type="submit" id="login-btn"
         style="padding:11px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px">
         Sign In
       </button>
-    </div>
+    </form>
   </div>
 </div>
 
