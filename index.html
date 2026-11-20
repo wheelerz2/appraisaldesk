@@ -7171,11 +7171,25 @@ function extractOrderData(raw) {
       }
     }
 
-    // Entry Contact → contact name on the NEXT line (inline slot has the right-column address)
-    // Strip right-column text (2+ spaces then rest of line)
-    const alEntryContactRaw = nextLineVal('Entry Contact:');
-    const alEntryContact = alEntryContactRaw ? alEntryContactRaw.split(/\s{2,}/)[0].trim() : '';
-    if (alEntryContact && !/N\/A|Map\s+Link|Queens|Kings|Bronx|Richmond|New York/i.test(alEntryContact)) trySet('f-insp-contact', alEntryContact);
+    // Entry Contact → contact name (next non-address line after label)
+    // pdftotext: label and address share a line; name is on the next line
+    // PDF.js:    label on own line, address on next, then name on the line after that
+    {
+      const ecIdx = text.search(/Entry\s+Contact:/i);
+      if (ecIdx >= 0) {
+        const afterLabel = text.slice(ecIdx);
+        // Walk lines after label; skip address-looking lines (start with digit or contain county/map)
+        const ecLines = afterLabel.split('\n').slice(1);
+        let ecName = '';
+        for (const ln of ecLines) {
+          const t = ln.split(/\s{2,}/)[0].trim(); // left column only
+          if (!t) continue;
+          if (/^\d|Map\s+Link|Queens|Kings|Bronx|Richmond|New York|County|N\/A/i.test(t)) continue;
+          if (/[A-Za-z]{2,}/.test(t)) { ecName = t; break; }
+        }
+        if (ecName) trySet('f-insp-contact', ecName);
+      }
+    }
 
     // Fee: "Total Appraiser Fee: $900.00" OR "Service Fee: $400.00"
     const alFeeInline = text.match(/Total\s+Appraiser\s+Fee:\s*\$?([\d,]+(?:\.\d{2})?)/i)
@@ -7784,10 +7798,17 @@ function extractOrderData(raw) {
      (/FILE\s+NUMBER\s*:/i.test(text) && /Microsoft\s+Reporting\s+Services/i.test(text)));
 
   if (isNHA) {
-    // Helper: grab first value on same line after a label
+    // Helper: grab value after a label — works in both pdftotext mode (value on same line)
+    // and PDF.js two-column mode (label on own line, value on next non-empty line).
     const nhaField = (label) => {
-      const m = text.match(new RegExp(label + '[:\\s]+([^\\n\\r]+)', 'i'));
-      return m ? m[1].trim() : '';
+      // Try same-line first (pdftotext -layout: "Borrower:   Woods, Reginald")
+      // Use (?::\s*|\s+) to match label followed by colon+space or spaces, then value on same line
+      const mInline = text.match(new RegExp(label + '(?::|\\s)[ \\t]+([^\\n\\r]{1,120})', 'i'));
+      if (mInline && mInline[1].trim()) return mInline[1].trim();
+      // Try next-line (PDF.js two-col: "Borrower:\nWoods, Reginald")
+      const mNext = text.match(new RegExp(label + ':?[ \\t]*\\n[ \\t]*([^\\n\\r]{1,120})', 'i'));
+      if (mNext && mNext[1].trim()) return mNext[1].trim();
+      return '';
     };
 
     // ── AMC = Norman Hubbard & Associates ────────────────────────────────
@@ -7817,10 +7838,15 @@ function extractOrderData(raw) {
     // We capture the value on the "Property" line AND the value on the "Address:" line.
     let nhaAddrFilled = false;
     // Style A: split label — "Property   <street>\nAddress:   <city, ST zip>"
-    const nhaAddrSplitM = text.match(/Property\s{2,}([^\n\r]+)\n[^\n\r]*Address:\s+([^\n\r]+)/i);
+    // Style A: NHA two-column split label — handles both:
+    //   pdftotext: "Property   228 Hancock Street\nAddress:   Brooklyn, NY 11216"
+    //   PDF.js:    "Property\n228 Hancock Street\nAddress:\nBrooklyn, NY 11216"
+    const nhaAddrSplitM = text.match(
+      /Property\s*(?:\s{2,}([^\n\r]+)|\n\s*([^\n\r]+))\n[^\n\r]*Address:\s*(?:\s{2,}([^\n\r]+)|\n\s*([^\n\r]+))/i
+    );
     if (nhaAddrSplitM) {
-      const street = nhaAddrSplitM[1].trim();
-      const cityLine = nhaAddrSplitM[2].trim();
+      const street = (nhaAddrSplitM[1] || nhaAddrSplitM[2] || '').trim();
+      const cityLine = (nhaAddrSplitM[3] || nhaAddrSplitM[4] || '').trim();
       if (street && /\d/.test(street)) {
         setAddressFields(street + ', ' + cityLine);
         nhaAddrFilled = true;
