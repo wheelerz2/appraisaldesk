@@ -3438,10 +3438,12 @@ function _sbUpsertOrder(rec) {
   if (!rec) return;
   _localSaveOrders(); // write cache immediately — before async Supabase
   sbSave('orders', rec).catch(e => console.warn('[AD] upsertOrder', e));
+  if (currentPage === 'dashboard') renderDashboard();
 }
 function _sbDeleteOrder(id) {
   _localSaveOrders(); // cache reflects deletion (orders array already updated)
   sbDelete('orders', id).catch(e => console.warn('[AD] deleteOrder', e));
+  if (currentPage === 'dashboard') renderDashboard();
 }
 function _sbUpsertAppraiser(rec) {
   if (rec) sbSave('appraisers', rec).catch(e => console.warn('[AD] upsertAppraiser', e));
@@ -3627,9 +3629,12 @@ function apName(id) {
 // ══════════════════════════════════════════
 function renderDashboard() {
   const today       = new Date();
-  const todayStr    = today.toISOString().slice(0, 10);
+  // Use local date strings (not UTC) so the date doesn't flip at 7 PM Eastern
+  const pad = n => String(n).padStart(2,'0');
+  const localDate = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const todayStr    = localDate(today);
   const tomorrow    = new Date(today); tomorrow.setDate(today.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+  const tomorrowStr = localDate(tomorrow);
 
   const dateEl = document.getElementById('dash-date');
   if (dateEl) dateEl.textContent = today.toLocaleDateString('en-US',
