@@ -7171,9 +7171,11 @@ function extractOrderData(raw) {
       }
     }
 
-    // Entry Contact → contact name (always on the NEXT line; inline is the right-column address)
-    const alEntryContact = nextLineVal('Entry\\s+Contact:');
-    if (alEntryContact && !/N\/A|Map\s+Link/i.test(alEntryContact)) trySet('f-insp-contact', alEntryContact);
+    // Entry Contact → contact name on the NEXT line (inline slot has the right-column address)
+    // Strip right-column text (2+ spaces then rest of line)
+    const alEntryContactRaw = nextLineVal('Entry Contact:');
+    const alEntryContact = alEntryContactRaw ? alEntryContactRaw.split(/\s{2,}/)[0].trim() : '';
+    if (alEntryContact && !/N\/A|Map\s+Link|Queens|Kings|Bronx|Richmond|New York/i.test(alEntryContact)) trySet('f-insp-contact', alEntryContact);
 
     // Fee: "Total Appraiser Fee: $900.00" OR "Service Fee: $400.00"
     const alFeeInline = text.match(/Total\s+Appraiser\s+Fee:\s*\$?([\d,]+(?:\.\d{2})?)/i)
@@ -7202,8 +7204,8 @@ function extractOrderData(raw) {
       }
     }
 
-    // Intended Use: Refinance (may be on next line after label)
-    const alIntended = inlineOrNext('Intended\\s+Use:');
+    // Intended Use: Purchase / Refinance / etc. (inline or next line)
+    const alIntended = inlineOrNext('Intended Use:');
     if (alIntended) trySet('f-purpose', normalizePurpose(alIntended));
 
     // Form type from JobType, Form:, or Property Types:
