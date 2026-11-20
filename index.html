@@ -8725,16 +8725,21 @@ function renderAppraisalPayments() {
   sel.innerHTML = '<option value="all">All Appraisers</option>' +
     apList.map(a => `<option value="${a.id}"${currentVal===a.id?' selected':''}>${esc(a.name)}</option>`).join('');
 
-  // Populate tax year dropdown from paid orders
+  // Populate tax year dropdown — from paid orders, plus current + recent years as fallback
   const taxSel = document.getElementById('ap-tax-year');
   if (taxSel) {
     const curTaxVal = taxSel.value;
-    const paidYears = [...new Set(
-      orders.filter(o => o.appraiserPaid).map(o => o.appraiserPaid.slice(0,4))
-    )].sort().reverse();
+    const fromPaid = orders.filter(o => o.appraiserPaid).map(o => o.appraiserPaid.slice(0,4));
+    const thisYear = new Date().getFullYear();
+    // Always include current year and 2 prior years so dropdown is never empty
+    const fallbackYears = [String(thisYear), String(thisYear-1), String(thisYear-2)];
+    const paidYears = [...new Set([...fromPaid, ...fallbackYears])].sort().reverse();
     taxSel.innerHTML = '<option value="">— Tax Year —</option>' +
       paidYears.map(y => `<option value="${y}"${curTaxVal===y?' selected':''}>${y}</option>`).join('');
-    if (!taxSel.value && paidYears.length) taxSel.value = paidYears[0]; // default to most recent
+    // Default to the most recent year that actually has paid orders, or current year
+    if (!taxSel.value) {
+      taxSel.value = fromPaid.length ? [...new Set(fromPaid)].sort().reverse()[0] : String(thisYear);
+    }
   }
 
   // Only completed orders with a fee and an appraiser assigned
