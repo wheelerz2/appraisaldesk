@@ -2016,7 +2016,7 @@ body.is-admin .admin-only { display: block !important; }
         <table class="income-table">
           <thead>
             <tr>
-              <th>Date</th>
+              <th>Submitted</th>
               <th>Address</th>
               <th>Client</th>
               <th>AMC / Lender</th>
@@ -8290,7 +8290,7 @@ function renderIncome() {
         const earn  = Math.round(o.fee * split / 100);
         const party = o.amc || o.lender || '—';
         html += `<tr onclick="openDetail('${o.id}')" style="cursor:pointer">
-          <td>${fmt(o.due)}</td>
+          <td>${o.created ? fmt(o.created.slice(0,10)) : '—'}</td>
           <td>${esc(o.address.split(',')[0])}</td>
           <td>${esc(o.client||'—')}</td>
           <td>${esc(party)}</td>
