@@ -7114,7 +7114,18 @@ function extractOrderData(raw) {
     // Style B: comma-separated inline line ending with ZIP (e.g. "355D Dormans Court, Far Rockaway, New York, 11693")
     if (!alAddrFilled) {
       const alInlineAddr = text.match(/(\d[\w\s\-\.,#]{8,60},\s*[A-Za-z][A-Za-z\s]+,\s*(?:New York|NY|New Jersey|NJ|Connecticut|CT|[A-Z]{2}),?\s*\d{5})/i);
-      if (alInlineAddr) { setAddressFields(alInlineAddr[1].trim()); alAddrFilled = true; }
+      if (alInlineAddr) {
+        // Normalize full state names → 2-letter abbrev so setAddressFields parses correctly
+        const normalizeState = s => s
+          .replace(/,?\s*New York\s*,/i, ', NY,')
+          .replace(/,?\s*New Jersey\s*,/i, ', NJ,')
+          .replace(/,?\s*Connecticut\s*,/i, ', CT,')
+          .replace(/,?\s*New York\s*(\d)/i, ', NY $1')
+          .replace(/,?\s*New Jersey\s*(\d)/i, ', NJ $1')
+          .replace(/,?\s*Connecticut\s*(\d)/i, ', CT $1');
+        setAddressFields(normalizeState(alInlineAddr[1].trim()));
+        alAddrFilled = true;
+      }
     }
 
     // Borrower: label on one line, name inline or on next line
