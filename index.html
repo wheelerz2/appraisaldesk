@@ -2048,6 +2048,42 @@ body.is-admin .admin-only { display: block !important; }
         </div>
       </div>
 
+      <!-- Client Report Controls -->
+      <div id="client-report-bar" style="background:var(--surface2,#f4f4f4);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
+        <div style="font-weight:600;font-size:13px;color:var(--muted);letter-spacing:.04em;align-self:center;white-space:nowrap">📊 Client Report</div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <label style="font-size:11px;color:var(--muted);font-weight:600">Group By</label>
+          <select id="rpt-entity-type" onchange="renderClientReportEntityList()" style="font-size:13px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text)">
+            <option value="amc">AMC</option>
+            <option value="lender">Lender</option>
+            <option value="both">AMC + Lender</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <label style="font-size:11px;color:var(--muted);font-weight:600">Client</label>
+          <select id="rpt-entity-name" style="font-size:13px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);min-width:160px">
+            <option value="all">— All —</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <label style="font-size:11px;color:var(--muted);font-weight:600">Status</label>
+          <select id="rpt-status" style="font-size:13px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text)">
+            <option value="all">All</option>
+            <option value="open">Unpaid / Open</option>
+            <option value="paid">Paid</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <label style="font-size:11px;color:var(--muted);font-weight:600">From</label>
+          <input type="date" id="rpt-date-from" style="font-size:13px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text)">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <label style="font-size:11px;color:var(--muted);font-weight:600">To</label>
+          <input type="date" id="rpt-date-to" style="font-size:13px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text)">
+        </div>
+        <button class="btn-primary" onclick="printClientReport()" style="font-size:13px;padding:6px 16px;white-space:nowrap">🖨 Print Report</button>
+      </div>
+
       <!-- Summary tiles -->
       <div class="acct-tiles" id="acct-tiles"></div>
 
@@ -3882,7 +3918,13 @@ function showPage(name) {
   if (name === 'appraisers') { populateAppraisersSelect(); renderAppraisers(); }
   if (name === 'companies') renderCompanies();
   if (name === 'income') renderIncome();
-  if (name === 'accounting') renderAccounting();
+  if (name === 'accounting') {
+    renderAccounting();
+    renderClientReportEntityList();
+    // Default date-to to today if not set
+    const dtTo = document.getElementById('rpt-date-to');
+    if (dtTo && !dtTo.value) dtTo.value = new Date().toISOString().slice(0,10);
+  }
   if (name === 'settings') renderSettings();
 }
 
@@ -9425,6 +9467,232 @@ function printInvoiceReport() {
     `As of ${dateStr}`,
     tableHtml, summaryHtml
   );
+}
+
+function renderClientReportEntityList() {
+  const type = (document.getElementById('rpt-entity-type')||{}).value || 'amc';
+  const sel = document.getElementById('rpt-entity-name');
+  if (!sel) return;
+  const prev = sel.value;
+  let names = [];
+  if (type === 'amc' || type === 'both') {
+    orders.forEach(o => { if (o.amc && o.amc.trim()) names.push(o.amc.trim()); });
+  }
+  if (type === 'lender' || type === 'both') {
+    orders.forEach(o => { if (o.lender && o.lender.trim()) names.push(o.lender.trim()); });
+  }
+  names = [...new Set(names)].sort();
+  sel.innerHTML = '<option value="all">— All —</option>' +
+    names.map(n => `<option value="${esc(n)}"${prev===n?' selected':''}>${esc(n)}</option>`).join('');
+  if (names.includes(prev)) sel.value = prev;
+}
+
+function printClientReport() {
+  const type      = (document.getElementById('rpt-entity-type')||{}).value || 'amc';
+  const entitySel = (document.getElementById('rpt-entity-name')||{}).value || 'all';
+  const statusSel = (document.getElementById('rpt-status')||{}).value || 'all';
+  const dateFrom  = (document.getElementById('rpt-date-from')||{}).value || '';
+  const dateTo    = (document.getElementById('rpt-date-to')||{}).value || '';
+  const dateStr   = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+
+  // Build enriched invoice list
+  const allInvoices = orders.filter(o => o.fee > 0).map(o => {
+    const fee     = parseFloat(o.fee)||0;
+    const paid    = (o.payments||[]).reduce((s,p)=>s+(parseFloat(p.amount)||0),0);
+    const balance = fee - paid;
+    const status  = balance<=0?'paid':paid>0?'partial':'open';
+    const orderDate = (o.orderSent||o.created||'').slice(0,10);
+    return {...o,_fee:fee,_paid:paid,_balance:balance,_status:status,_orderDate:orderDate};
+  });
+
+  // Apply date range filter (using orderSent/created date)
+  let filtered = allInvoices.filter(o => {
+    if (dateFrom && o._orderDate && o._orderDate < dateFrom) return false;
+    if (dateTo   && o._orderDate && o._orderDate > dateTo)   return false;
+    return true;
+  });
+
+  // Apply status filter
+  filtered = filtered.filter(o => {
+    if (statusSel === 'open') return o._status !== 'paid';
+    if (statusSel === 'paid') return o._status === 'paid';
+    return true;
+  });
+
+  // Determine which entities to group by and filter to
+  function getEntityKeys(o) {
+    const keys = [];
+    if (type === 'amc' || type === 'both') {
+      if (o.amc && o.amc.trim()) keys.push({label:'AMC', name:o.amc.trim()});
+    }
+    if (type === 'lender' || type === 'both') {
+      if (o.lender && o.lender.trim()) keys.push({label:'Lender', name:o.lender.trim()});
+    }
+    if (keys.length === 0) keys.push({label: type==='lender'?'Lender':'AMC', name:'(None)'});
+    return keys;
+  }
+
+  // Build entity → orders map
+  const entityMap = {};
+  filtered.forEach(o => {
+    const keys = getEntityKeys(o);
+    // If filtering to a specific entity, skip non-matching
+    if (entitySel !== 'all') {
+      if (!keys.some(k => k.name === entitySel)) return;
+    }
+    keys.forEach(k => {
+      const mapKey = k.label + '|' + k.name;
+      if (!entityMap[mapKey]) entityMap[mapKey] = {label:k.label, name:k.name, rows:[]};
+      entityMap[mapKey].rows.push(o);
+    });
+  });
+
+  // Sort entities by label then name
+  const entities = Object.values(entityMap).sort((a,b) =>
+    (a.label+a.name).localeCompare(b.label+b.name)
+  );
+
+  if (entities.length === 0) {
+    alert('No orders match the selected filters.');
+    return;
+  }
+
+  const typeLabel   = type==='amc'?'AMC':type==='lender'?'Lender':'AMC + Lender';
+  const entityLabel = entitySel==='all'?'All':entitySel;
+  const statusLabel = statusSel==='open'?'Unpaid / Open':statusSel==='paid'?'Paid':'All';
+  const rangeLabel  = (dateFrom||dateTo) ? `${dateFrom||'start'} → ${dateTo||'today'}` : 'All Dates';
+
+  const fmt = d => {
+    if (!d) return '—';
+    const [y,m,dy] = d.split('-');
+    if (!y||!m||!dy) return d;
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${months[parseInt(m,10)-1]} ${parseInt(dy,10)}, ${y}`;
+  };
+
+  // Build section HTML for each entity
+  let sectionsHtml = '';
+  let grandBilled = 0, grandPaid = 0, grandBal = 0, grandCount = 0;
+
+  entities.forEach((ent, idx) => {
+    const rows = ent.rows.sort((a,b)=>(b._orderDate||'').localeCompare(a._orderDate||''));
+    const eBilled = rows.reduce((s,o)=>s+o._fee,0);
+    const ePaid   = rows.reduce((s,o)=>s+o._paid,0);
+    const eBal    = rows.reduce((s,o)=>s+o._balance,0);
+    grandBilled += eBilled; grandPaid += ePaid; grandBal += eBal; grandCount += rows.length;
+
+    const rowsHtml = rows.map(o => {
+      const badgeCls = o._status==='paid'?'badge-paid':o._status==='partial'?'badge-partial':'badge-open';
+      const badgeTxt = o._status==='paid'?'Paid':o._status==='partial'?'Partial':'Open';
+      return `<tr>
+        <td style="white-space:nowrap">${fmt(o._orderDate)}</td>
+        <td>${esc(o.address||'—')}</td>
+        <td>${esc(o.client||'—')}</td>
+        <td class="num">$${o._fee.toFixed(2)}</td>
+        <td class="num">${o._paid>0?'$'+o._paid.toFixed(2):'—'}</td>
+        <td class="num" style="color:${o._balance>0?'#b91c1c':'inherit'}">${o._balance>0?'$'+o._balance.toFixed(2):'—'}</td>
+        <td style="text-align:center"><span class="badge ${badgeCls}">${badgeTxt}</span></td>
+      </tr>`;
+    }).join('');
+
+    const pageBreak = idx > 0 ? '<div class="page-break"></div>' : '';
+    sectionsHtml += `${pageBreak}
+      <div class="entity-section">
+        <div class="entity-header">
+          <span class="entity-type-badge">${esc(ent.label)}</span>
+          <span class="entity-name">${esc(ent.name)}</span>
+          <span class="entity-count">${rows.length} order${rows.length!==1?'s':''}</span>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Date</th><th>Address</th><th>Client / Borrower</th><th class="num">Invoice</th><th class="num">Paid</th><th class="num">Balance</th><th style="text-align:center">Status</th></tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+          <tfoot>
+            <tr class="subtotal-row">
+              <td colspan="3"><strong>${esc(ent.name)} Subtotal</strong></td>
+              <td class="num"><strong>$${eBilled.toFixed(2)}</strong></td>
+              <td class="num"><strong>$${ePaid.toFixed(2)}</strong></td>
+              <td class="num" style="color:${eBal>0?'#b91c1c':'inherit'}"><strong>${eBal>0?'$'+eBal.toFixed(2):'—'}</strong></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>`;
+  });
+
+  const grandHtml = `<div class="summary-row" style="margin-top:20px">
+    <div class="summary-tile"><div class="tile-lbl">Total Billed</div><div class="tile-val">$${grandBilled.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div class="tile-detail">${grandCount} orders · ${entities.length} ${typeLabel}${entities.length!==1?'s':''}</div></div>
+    <div class="summary-tile good"><div class="tile-lbl">Collected</div><div class="tile-val">$${grandPaid.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div></div>
+    <div class="summary-tile warn"><div class="tile-lbl">Outstanding</div><div class="tile-val">$${grandBal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div></div>
+  </div>`;
+
+  const css = `
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;margin:0;padding:0;background:#fff}
+    .print-header{background:#1c3258;color:#fff;padding:16px 28px;display:flex;align-items:center;justify-content:space-between}
+    .print-header h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.02em}
+    .print-header .sub{font-size:12px;opacity:.8;margin-top:3px}
+    .print-header .print-date{font-size:12px;opacity:.7;text-align:right}
+    .print-btn{display:inline-block;margin:16px 28px;padding:8px 20px;background:#1c3258;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600}
+    @media print{.print-btn{display:none}}
+    .content{padding:20px 28px}
+    .filter-info{background:#f4f4f4;border-radius:6px;padding:10px 14px;font-size:12px;color:#555;display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px}
+    .filter-chip{display:flex;gap:5px;align-items:center}
+    .filter-chip strong{color:#1c3258}
+    .summary-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+    .summary-tile{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 18px;min-width:140px;flex:1}
+    .summary-tile.good{background:#f0fdf4;border-color:#bbf7d0}
+    .summary-tile.warn{background:#fff7ed;border-color:#fed7aa}
+    .tile-lbl{font-size:11px;font-weight:600;color:#6b7280;letter-spacing:.05em;text-transform:uppercase}
+    .tile-val{font-size:22px;font-weight:700;color:#1c3258;margin:4px 0 2px}
+    .tile-detail{font-size:11px;color:#9ca3af}
+    .entity-section{margin-bottom:24px}
+    .entity-header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#1c3258;color:#fff;border-radius:8px 8px 0 0;font-size:13px}
+    .entity-type-badge{background:rgba(255,255,255,.2);border-radius:4px;padding:2px 7px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+    .entity-name{font-weight:700;font-size:15px;flex:1}
+    .entity-count{font-size:12px;opacity:.8}
+    table{width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;overflow:hidden}
+    thead tr{background:#f9fafb}
+    th{text-align:left;padding:7px 10px;font-size:11px;font-weight:700;color:#6b7280;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid #e5e7eb}
+    td{padding:7px 10px;border-bottom:1px solid #f3f4f6;vertical-align:top}
+    tbody tr:last-child td{border-bottom:none}
+    tbody tr:hover{background:#f9fafb}
+    .num{text-align:right;font-variant-numeric:tabular-nums;font-family:monospace}
+    .subtotal-row td{background:#f4f4f4;border-top:2px solid #e5e7eb;font-size:13px}
+    tfoot tr td{background:#eef2f7;padding:8px 10px;font-size:13px}
+    .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;letter-spacing:.04em}
+    .badge-paid{background:#dcfce7;color:#15803d}
+    .badge-partial{background:#fef9c3;color:#a16207}
+    .badge-open{background:#fee2e2;color:#b91c1c}
+    .page-break{page-break-before:always;height:0;margin:0;padding:0}
+    @page{margin:15mm}
+  `;
+
+  const win = window.open('','_blank','width=1050,height=800');
+  if (!win) { alert('Pop-up blocked — please allow pop-ups for this page.'); return; }
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>Client Report — ${esc(entityLabel)}</title>
+    <style>${css}</style></head><body>
+    <div class="print-header">
+      <div>
+        <div class="h1" style="font-size:18px;font-weight:700">Richard Hahn Appraisal LLC</div>
+        <div class="sub">Client Report — ${esc(typeLabel)}: ${esc(entityLabel)}</div>
+      </div>
+      <div class="print-date">Printed ${dateStr}</div>
+    </div>
+    <button class="print-btn" onclick="window.print()">🖨 Print / Save PDF</button>
+    <div class="content">
+      <div class="filter-info">
+        <div class="filter-chip"><strong>Group By:</strong> ${esc(typeLabel)}</div>
+        <div class="filter-chip"><strong>Client:</strong> ${esc(entityLabel)}</div>
+        <div class="filter-chip"><strong>Status:</strong> ${esc(statusLabel)}</div>
+        <div class="filter-chip"><strong>Date Range:</strong> ${esc(rangeLabel)}</div>
+      </div>
+      ${grandHtml}
+      ${sectionsHtml}
+    </div>
+  </body></html>`);
+  win.document.close();
 }
 
 function emailInvoiceReport() {
