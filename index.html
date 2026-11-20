@@ -5186,6 +5186,8 @@ function apInitials(appraiserId) {
 
 function calFilteredOrders() {
   return orders.filter(o => {
+    // Non-admin appraisers only see their own orders
+    if (!isAdmin && currentAppraiserId && o.appraiserId !== currentAppraiserId) return false;
     if (calFilters.appraiser !== 'all') {
       if (calFilters.appraiser === '__none__') { if (o.appraiserId) return false; }
       else if (o.appraiserId !== calFilters.appraiser) return false;
@@ -5203,7 +5205,10 @@ function calFilteredOrders() {
 }
 
 function buildCalSidebar() {
-  const calOrders = orders; // sidebar shows counts from ALL orders
+  // Non-admin appraisers see only their own orders in sidebar counts
+  const calOrders = (!isAdmin && currentAppraiserId)
+    ? orders.filter(o => o.appraiserId === currentAppraiserId)
+    : orders;
 
   // Appraiser buttons
   const apEl = document.getElementById('cal-appraiser-filters');
