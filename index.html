@@ -7796,14 +7796,37 @@ function extractOrderData(raw) {
     }
 
     // ── Property Address ──────────────────────────────────────────────────
-    // "Property  Address:  228 Hancock Street" then next line "Brooklyn, NY 11216"
-    const nhaAddrM = text.match(/Property\s+Address\s*:\s*([^\n\r]+)/i);
-    if (nhaAddrM) {
-      const addrLine1 = nhaAddrM[1].trim();
-      const afterAddr = text.slice(text.indexOf(nhaAddrM[0]) + nhaAddrM[0].length);
-      const cityLineM = afterAddr.match(/^\s*\n\s*([^\n\r]+)/);
-      const addrFull = cityLineM ? addrLine1 + ', ' + cityLineM[1].trim() : addrLine1;
-      setAddressFields(addrFull);
+    // NHA uses a two-column layout where the label wraps across two lines:
+    //   "Property                  228 Hancock Street"
+    //   "Address:                  Brooklyn, NY 11216"
+    // We capture the value on the "Property" line AND the value on the "Address:" line.
+    let nhaAddrFilled = false;
+    // Style A: split label — "Property   <street>\nAddress:   <city, ST zip>"
+    const nhaAddrSplitM = text.match(/Property\s{2,}([^\n\r]+)\n[^\n\r]*Address:\s+([^\n\r]+)/i);
+    if (nhaAddrSplitM) {
+      const street = nhaAddrSplitM[1].trim();
+      const cityLine = nhaAddrSplitM[2].trim();
+      if (street && /\d/.test(street)) {
+        setAddressFields(street + ', ' + cityLine);
+        nhaAddrFilled = true;
+      }
+    }
+    // Style B: label on one line — "Property Address:  228 Hancock Street\n  Brooklyn, NY 11216"
+    if (!nhaAddrFilled) {
+      const nhaAddrM = text.match(/Property\s+Address\s*:\s*([^\n\r]+)/i);
+      if (nhaAddrM) {
+        const addrLine1 = nhaAddrM[1].trim();
+        const afterAddr = text.slice(text.indexOf(nhaAddrM[0]) + nhaAddrM[0].length);
+        const cityLineM = afterAddr.match(/^\s*\n\s*([^\n\r]+)/);
+        const addrFull = cityLineM ? addrLine1 + ', ' + cityLineM[1].trim() : addrLine1;
+        setAddressFields(addrFull);
+        nhaAddrFilled = true;
+      }
+    }
+    // Style C: bare inline address anywhere (e.g. "228 Hancock Street, Brooklyn, NY 11216")
+    if (!nhaAddrFilled) {
+      const nhaInlineAddr = text.match(/(\d[\w\s\-\.#]{5,50},\s*[A-Za-z][A-Za-z\s]+,\s*(?:NY|NJ|CT|[A-Z]{2})\s+\d{5})/);
+      if (nhaInlineAddr) setAddressFields(nhaInlineAddr[1].trim());
     }
 
     // ── Order Type → form type ────────────────────────────────────────────
