@@ -8850,6 +8850,8 @@ function _buildPrintWindow(title, subtitle, tableHtml, summaryHtml) {
   return win;
 }
 
+</script>
+
 <!-- ══ LOGIN OVERLAY ══ -->
 <div id="login-overlay" style="display:none;position:fixed;inset:0;background:var(--paper);z-index:99999;align-items:center;justify-content:center">
   <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.12)">
@@ -8918,6 +8920,7 @@ function _buildPrintWindow(title, subtitle, tableHtml, summaryHtml) {
   </div>
 </div>
 
+<script>
 function printAppraisalPayments() {
   const sel = document.getElementById('ap-pay-appraiser');
   const apLabel = sel ? sel.options[sel.selectedIndex]?.text : 'All Appraisers';
