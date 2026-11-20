@@ -7797,7 +7797,7 @@ function extractOrderData(raw) {
     (/Norman\s+Hubbard|NHAUDS|914-997-1484/i.test(text) ||
      (/FILE\s+NUMBER\s*:/i.test(text) && /Microsoft\s+Reporting\s+Services/i.test(text)));
 
-  if (isNHA) {
+  if (isNHA && !isAppraisalLinks) {
     // Helper: grab value after a label — works in both pdftotext mode (value on same line)
     // and PDF.js two-column mode (label on own line, value on next non-empty line).
     const nhaField = (label) => {
