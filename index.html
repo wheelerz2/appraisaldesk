@@ -7060,7 +7060,7 @@ function extractOrderData(raw) {
   // Similarly: "Address 1:  Address2:" / "4916 66Th St  N/A"
   //            "Borrower:  Phone#" / "Antonio Ambrosino  N/A"
   //            "Work#:  Cell#" / "N/A  718-938-7476"
-  const isAppraisalLinks = /appraisallinks|appraisalscope/i.test(text);
+  const isAppraisalLinks = /appraisal\s*links|appraisalscope/i.test(text);
   if (isAppraisalLinks) {
     // Helper: get value on the NEXT non-empty line after a label
     function nextLineVal(label) {
