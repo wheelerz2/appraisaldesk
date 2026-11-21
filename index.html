@@ -4444,6 +4444,10 @@ function quickStatus(id, status) {
     return;
   }
   o.status = status;
+  // Auto-set orderSent when marking complete via quick status
+  if (status === 'complete' && !o.orderSent) {
+    o.orderSent = localDateStr();
+  }
   _sbUpsertOrder(o);
   openDetail(id); // re-render panel
   buildSidebarFilters();
@@ -4856,6 +4860,20 @@ function _autoSaveNow() {
     notes:        document.getElementById('f-notes').value.trim(),
   };
 
+  // Auto-set orderSent when marking complete
+  if (data.status === 'complete' && !data.orderSent) {
+    data.orderSent = localDateStr();
+    const sentEl = document.getElementById('f-order-sent');
+    if (sentEl) sentEl.value = data.orderSent;
+  }
+  // Auto-advance to Inspection Scheduled when inspection date is set on an open order
+  const _openStatuses = ['new','questionnaire','review','contract'];
+  if (data.inspection && _openStatuses.includes(data.status)) {
+    data.status = 'inspection';
+    const stEl = document.getElementById('f-status');
+    if (stEl) stEl.value = 'inspection';
+  }
+
   orders[idx] = { ...orders[idx], ...data };
   _sbUpsertOrder(orders[idx]);
 
@@ -5006,10 +5024,15 @@ function saveOrder() {
     notes:       document.getElementById('f-notes').value.trim(),
   };
 
-  // Auto-advance: if inspection date is set and status is still 'new', bump to 'inspection'
-  if (data.inspection && data.status === 'new') {
+  // Auto-advance: if inspection date is set and order is still in a pre-inspection status, bump to 'inspection'
+  if (data.inspection && ['new','questionnaire','review','contract'].includes(data.status)) {
     data.status = 'inspection';
     document.getElementById('f-status').value = 'inspection';
+  }
+  // Auto-set orderSent when marking complete (saveOrder path may not have caught it yet)
+  if (data.status === 'complete' && !data.orderSent) {
+    data.orderSent = localDateStr();
+    document.getElementById('f-order-sent').value = data.orderSent;
   }
 
   let savedOrder;
