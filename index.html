@@ -6581,7 +6581,7 @@ function extractOrderData(raw) {
   }
 
   // ── Detect format ────────────────────────────────────────────────────────
-  const isAppraisalPort = /appraisalport\.com/i.test(text) || (/Engagement Letter/i.test(text) && !/allproamc\.com/i.test(text));
+  const isAppraisalPort = /appraisalport\.com/i.test(text) || (/Engagement Letter/i.test(text) && !/allproamc\.com/i.test(text) && !/appraisal\s*links/i.test(text));
   const isVLConnect     = /connectvl\.com|VL Connect/i.test(text);
   // isNVPN is declared inline below before its parser block
 
