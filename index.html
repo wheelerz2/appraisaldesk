@@ -2106,6 +2106,16 @@ body.is-admin .admin-only { display: block !important; }
       <!-- Summary tiles -->
       <div class="acct-tiles" id="acct-tiles"></div>
 
+      <!-- Year filter pill -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Period</span>
+        <div class="acct-tab-pill" id="acctYearPill">
+          <button class="acct-tp-btn active" onclick="setAcctYear('this',this)">This Year</button>
+          <button class="acct-tp-btn" onclick="setAcctYear('last',this)">Last Year</button>
+          <button class="acct-tp-btn" onclick="setAcctYear('3yr',this)">Past 3 Years</button>
+        </div>
+      </div>
+
       <!-- KPI tiles row (dynamic) -->
       <div class="acct-kpi-row" id="acct-kpi-row"></div>
 
@@ -8985,6 +8995,14 @@ function incomeExportCSV() {
 // ACCOUNTING
 // ══════════════════════════════════════════
 let acctFilter = 'open';
+let acctYearFilter = 'this'; // 'this' | 'last' | '3yr'
+
+function setAcctYear(mode, btn) {
+  acctYearFilter = mode;
+  document.querySelectorAll('#acctYearPill .acct-tp-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderAccounting();
+}
 
 function setAcctFilter(f, btn) {
   acctFilter = f;
@@ -9081,9 +9099,23 @@ function renderAccounting() {
   const now = new Date();
   const thisYear = now.getFullYear();
 
+  // ── Year range from filter ─────────────────────────────────────────────
+  let yearRange; // array of years to include in KPI/charts
+  if (acctYearFilter === 'last') {
+    yearRange = [thisYear - 1];
+  } else if (acctYearFilter === '3yr') {
+    yearRange = [thisYear - 2, thisYear - 1, thisYear];
+  } else {
+    yearRange = [thisYear]; // 'this'
+  }
+  const inYearRange = d => { if (!d) return false; const y = parseInt(d.slice(0,4)); return yearRange.includes(y); };
+  const periodLabel = acctYearFilter === 'last' ? String(thisYear-1)
+    : acctYearFilter === '3yr' ? `${thisYear-2}–${thisYear}`
+    : String(thisYear);
+
   // ── Compute totals ─────────────────────────────────────────────────────
   let totalBilled = 0, totalCollected = 0, openCount = 0;
-  const invoices = orders.filter(o => {
+  const allInvoicesMapped = orders.filter(o => {
     if (o.fee <= 0) return false;
     if (!isAdmin && currentAppraiserId && o.appraiserId !== currentAppraiserId) return false;
     return true;
@@ -9093,11 +9125,19 @@ function renderAccounting() {
     const paid     = pmts.reduce((s, p) => s + (parseFloat(p.amount)||0), 0);
     const balance  = fee - paid;
     const status   = balance <= 0 ? 'paid' : paid > 0 ? 'partial' : 'open';
-    totalBilled    += fee;
-    totalCollected += paid;
-    if (status !== 'paid') openCount++;
     return { ...o, _fee: fee, _paid: paid, _balance: balance, _status: status };
   });
+
+  // Period-filtered invoices for KPI tiles and charts
+  const invoices = allInvoicesMapped.filter(o => inYearRange(o.due || o.created || ''));
+  invoices.forEach(o => {
+    totalBilled    += o._fee;
+    totalCollected += o._paid;
+    if (o._status !== 'paid') openCount++;
+  });
+
+  // All invoices (any year) for open-invoice charts and table
+  const allInvoices = allInvoicesMapped;
 
   const outstanding = totalBilled - totalCollected;
   const collRate    = totalBilled > 0 ? Math.round(totalCollected / totalBilled * 1000) / 10 : 0;
@@ -9110,66 +9150,91 @@ function renderAccounting() {
   // ── KPI Row ───────────────────────────────────────────────────────────
   const kpiRow = document.getElementById('acct-kpi-row');
   if (kpiRow) {
-    // Compare to same period last year
-    const lastYear = thisYear - 1;
+    // Compare to prior period of same length
+    const priorYears = yearRange.map(y => y - yearRange.length);
     let lyBilled = 0, lyCollected = 0;
-    invoices.forEach(o => {
+    allInvoicesMapped.forEach(o => {
       const d = o.due || o.created || '';
-      if (d.startsWith(String(lastYear))) { lyBilled += o._fee; lyCollected += o._paid; }
+      if (!d) return;
+      const y = parseInt(d.slice(0,4));
+      if (priorYears.includes(y)) { lyBilled += o._fee; lyCollected += o._paid; }
     });
     const billedDelta    = lyBilled    > 0 ? Math.round((totalBilled    - lyBilled)    / lyBilled    * 100) : null;
     const collectedDelta = lyCollected > 0 ? Math.round((totalCollected - lyCollected) / lyCollected * 100) : null;
 
     const delta = (v, suffix='%') => v === null ? '' :
-      `<div class="acct-kpi-delta ${v>=0?'up':'down'}">${v>=0?'↑':'↓'} ${Math.abs(v)}${suffix} vs last year</div>`;
+      `<div class="acct-kpi-delta ${v>=0?'up':'down'}">${v>=0?'↑':'↓'} ${Math.abs(v)}${suffix} vs prior period</div>`;
 
     kpiRow.innerHTML = `
       <div class="acct-kpi">
-        <div class="acct-kpi-label">Total Billed</div>
+        <div class="acct-kpi-label">Total Billed · ${periodLabel}</div>
         <div class="acct-kpi-value">$${totalBilled.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
         ${delta(billedDelta)}
       </div>
       <div class="acct-kpi">
-        <div class="acct-kpi-label">Collected</div>
+        <div class="acct-kpi-label">Collected · ${periodLabel}</div>
         <div class="acct-kpi-value">$${totalCollected.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
         ${delta(collectedDelta)}
       </div>
       <div class="acct-kpi">
-        <div class="acct-kpi-label">Open Invoices</div>
+        <div class="acct-kpi-label">Open Invoices (All Time)</div>
         <div class="acct-kpi-value">$${outstanding.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
         <div class="acct-kpi-delta ${openCount>0?'down':'neu'}">${openCount} order${openCount!==1?'s':''}</div>
       </div>
       <div class="acct-kpi">
-        <div class="acct-kpi-label">Collection Rate</div>
+        <div class="acct-kpi-label">Collection Rate · ${periodLabel}</div>
         <div class="acct-kpi-value">${collRate}%</div>
         <div class="acct-kpi-delta ${collRate>=90?'up':collRate>=80?'neu':'down'}">Avg fee $${avgFee.toLocaleString()}</div>
       </div>`;
   }
 
   // ── Monthly chart data ─────────────────────────────────────────────────
+  // For single-year views: show 12 months. For 3-year: show by year instead.
   const monthlyTotals    = Array(12).fill(0);
   const monthlyCollected = Array(12).fill(0);
-  invoices.forEach(o => {
-    const d = o.due || o.created || '';
-    if (!d) return;
-    const yr = parseInt(d.slice(0,4)); if (yr !== thisYear) return;
-    const mo = parseInt(d.slice(5,7)) - 1;
-    if (mo < 0 || mo > 11) return;
-    monthlyTotals[mo]    += o._fee;
-    monthlyCollected[mo] += o._paid;
-  });
+  if (acctYearFilter !== '3yr') {
+    const chartYear = acctYearFilter === 'last' ? thisYear - 1 : thisYear;
+    invoices.forEach(o => {
+      const d = o.due || o.created || '';
+      if (!d) return;
+      const yr = parseInt(d.slice(0,4)); if (yr !== chartYear) return;
+      const mo = parseInt(d.slice(5,7)) - 1;
+      if (mo < 0 || mo > 11) return;
+      monthlyTotals[mo]    += o._fee;
+      monthlyCollected[mo] += o._paid;
+    });
+  } else {
+    // For 3-year, monthly chart shows each of the 3 years as a single bar (Jan slot)
+    yearRange.forEach((y, i) => {
+      const yBilled    = invoices.filter(o => (o.due||o.created||'').startsWith(String(y))).reduce((s,o)=>s+o._fee,0);
+      const yCollected = invoices.filter(o => (o.due||o.created||'').startsWith(String(y))).reduce((s,o)=>s+o._paid,0);
+      monthlyTotals[i*4]    = yBilled;
+      monthlyCollected[i*4] = yCollected;
+    });
+  }
   _monthBilledData    = monthlyTotals;
   _monthCollectedData = monthlyCollected;
-  _drawMonthlyChart();
+  // Override month labels for 3yr mode
+  if (acctYearFilter === '3yr') {
+    // Temporarily patch labels so the chart reads as years, not months
+    const yr3Labels = Array(12).fill('');
+    yearRange.forEach((y,i) => yr3Labels[i*4] = String(y));
+    const saved = [..._MONTH_LABELS];
+    _MONTH_LABELS.splice(0,12,...yr3Labels);
+    _drawMonthlyChart();
+    _MONTH_LABELS.splice(0,12,...saved);
+  } else {
+    _drawMonthlyChart();
+  }
 
   const yearLabel = document.getElementById('acct-year-label');
-  if (yearLabel) yearLabel.textContent = thisYear;
+  if (yearLabel) yearLabel.textContent = periodLabel;
 
-  // ── Yearly chart ───────────────────────────────────────────────────────
+  // ── Yearly chart — always uses all invoices (not period-filtered) ──────
   const years = [];
   for (let y = thisYear - 4; y <= thisYear; y++) years.push(y);
-  const yearlyTotals    = years.map(y => invoices.filter(o => { const d = o.due||o.created||''; return d.startsWith(String(y)); }).reduce((s,o)=>s+o._fee,0));
-  const yearlyCollected = years.map(y => invoices.filter(o => { const d = o.due||o.created||''; return d.startsWith(String(y)); }).reduce((s,o)=>s+o._paid,0));
+  const yearlyTotals    = years.map(y => allInvoicesMapped.filter(o => { const d = o.due||o.created||''; return d.startsWith(String(y)); }).reduce((s,o)=>s+o._fee,0));
+  const yearlyCollected = years.map(y => allInvoicesMapped.filter(o => { const d = o.due||o.created||''; return d.startsWith(String(y)); }).reduce((s,o)=>s+o._paid,0));
   {
     const tc = _chartTheme();
     _acctChart('chart-yearly', {
@@ -9207,8 +9272,8 @@ function renderAccounting() {
     });
   }
 
-  // ── Open invoice charts by AMC and Lender ─────────────────────────────
-  const openInvoices = invoices.filter(o => o._balance > 0);
+  // ── Open invoice charts by AMC and Lender (always all-time, not period filtered) ──
+  const openInvoices = allInvoicesMapped.filter(o => o._balance > 0);
 
   function _drawHorizInvoiceChart(canvasId, groupMap, label) {
     const tc = _chartTheme();
@@ -9281,8 +9346,8 @@ function renderAccounting() {
     }
   }
 
-  // ── Invoice table ──────────────────────────────────────────────────────
-  const filtered = invoices.filter(o => {
+  // ── Invoice table (always all-time, filtered by Open/Paid/All tab) ───────
+  const filtered = allInvoicesMapped.filter(o => {
     if (acctFilter === 'open') return o._status !== 'paid';
     if (acctFilter === 'paid') return o._status === 'paid';
     return true;
