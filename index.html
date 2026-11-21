@@ -3,6 +3,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Outfit:wght@400;500;600&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 /* Leaflet 1.9.4 core CSS — inlined to satisfy CSP */
 .leaflet-pane,.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow,.leaflet-tile-container,.leaflet-pane>svg,.leaflet-pane>canvas,.leaflet-zoom-box,.leaflet-image-layer,.leaflet-layer{position:absolute;left:0;top:0}.leaflet-container{overflow:hidden}.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow{-webkit-user-select:none;-moz-user-select:none;user-select:none;-webkit-user-drag:none}.leaflet-tile::selection{background:transparent}.leaflet-safari .leaflet-tile{image-rendering:-webkit-optimize-contrast}.leaflet-safari .leaflet-tile-container{width:1600px;height:1600px;-webkit-transform-origin:0 0}.leaflet-marker-icon,.leaflet-marker-shadow{display:block}.leaflet-container .leaflet-overlay-pane svg{max-width:none!important;max-height:none!important}.leaflet-container .leaflet-marker-pane img,.leaflet-container .leaflet-shadow-pane img,.leaflet-container .leaflet-tile-pane img,.leaflet-container img.leaflet-image-layer,.leaflet-container .leaflet-tile{max-width:none!important;max-height:none!important;width:auto;padding:0}.leaflet-container.leaflet-touch-zoom{-ms-touch-action:pan-x pan-y;touch-action:pan-x pan-y}.leaflet-container.leaflet-touch-drag{-ms-touch-action:pinch-zoom;touch-action:none;touch-action:pinch-zoom}.leaflet-container.leaflet-touch-drag.leaflet-touch-zoom{-ms-touch-action:none;touch-action:none}.leaflet-container{-webkit-tap-highlight-color:transparent}.leaflet-container a{-webkit-tap-highlight-color:rgba(51,181,229,.4)}.leaflet-tile{filter:inherit;visibility:hidden}.leaflet-tile-loaded{visibility:inherit}.leaflet-zoom-box{width:0;height:0;-moz-box-sizing:border-box;box-sizing:border-box;z-index:800}.leaflet-overlay-pane svg{-moz-user-select:none}.leaflet-pane{z-index:400}.leaflet-tile-pane{z-index:200}.leaflet-overlay-pane{z-index:400}.leaflet-shadow-pane{z-index:500}.leaflet-marker-pane{z-index:600}.leaflet-tooltip-pane{z-index:650}.leaflet-popup-pane{z-index:700}.leaflet-map-pane canvas{z-index:100}.leaflet-map-pane svg{z-index:200}.leaflet-vml-shape{width:1px;height:1px}.lvml{behavior:url(#default#VML);display:inline-block;position:absolute}.leaflet-control{position:relative;z-index:800;pointer-events:visiblePainted;pointer-events:auto}.leaflet-top,.leaflet-bottom{position:absolute;z-index:1000;pointer-events:none}.leaflet-top{top:0}.leaflet-right{right:0}.leaflet-bottom{bottom:0}.leaflet-left{left:0}.leaflet-control{float:left;clear:both}.leaflet-right .leaflet-control{float:right}.leaflet-top .leaflet-control{margin-top:10px}.leaflet-bottom .leaflet-control{margin-bottom:10px}.leaflet-left .leaflet-control{margin-left:10px}.leaflet-right .leaflet-control{margin-right:10px}.leaflet-fade-anim .leaflet-popup{opacity:0;-webkit-transition:opacity .2s linear;-moz-transition:opacity .2s linear;transition:opacity .2s linear}.leaflet-fade-anim .leaflet-map-pane .leaflet-popup{opacity:1}.leaflet-zoom-animated{-webkit-transform-origin:0 0;-ms-transform-origin:0 0;transform-origin:0 0}.leaflet-zoom-anim .leaflet-zoom-animated{will-change:transform}.leaflet-zoom-anim .leaflet-zoom-animated{-webkit-transition:-webkit-transform .25s cubic-bezier(0,0,.25,1);-moz-transition:-moz-transform .25s cubic-bezier(0,0,.25,1);transition:transform .25s cubic-bezier(0,0,.25,1)}.leaflet-pan-anim .leaflet-tile,.leaflet-zoom-anim .leaflet-tile{-webkit-transition:none;-moz-transition:none;transition:none}.leaflet-zoom-anim .leaflet-zoom-animated{pointer-events:none}.leaflet-dragging .leaflet-grab,.leaflet-dragging .leaflet-grab .leaflet-interactive,.leaflet-dragging .leaflet-marker-draggable{cursor:move;cursor:-webkit-grabbing;cursor:-moz-grabbing;cursor:grabbing}.leaflet-grab{cursor:-webkit-grab;cursor:-moz-grab;cursor:grab}.leaflet-crosshair,.leaflet-crosshair .leaflet-interactive{cursor:crosshair}.leaflet-popup-pane,.leaflet-control{cursor:auto}.leaflet-interactive{cursor:pointer}.leaflet-container .leaflet-interactive{outline:0!important}.leaflet-bar{box-shadow:0 1px 5px rgba(0,0,0,.65);border-radius:4px}.leaflet-bar a{background-color:#fff;border-bottom:1px solid #ccc;width:26px;height:26px;line-height:26px;display:block;text-align:center;text-decoration:none;color:#000}.leaflet-bar a,.leaflet-control-layers-toggle{background-position:50% 50%;background-repeat:no-repeat;display:block}.leaflet-bar a:hover,.leaflet-bar a:focus{background-color:#f4f4f4}.leaflet-bar a:first-child{border-top-left-radius:4px;border-top-right-radius:4px}.leaflet-bar a:last-child{border-bottom-left-radius:4px;border-bottom-right-radius:4px;border-bottom:none}.leaflet-bar a.leaflet-disabled{cursor:default;background-color:#f4f4f4;color:#bbb}.leaflet-touch .leaflet-bar a{width:30px;height:30px;line-height:30px}.leaflet-touch .leaflet-bar a:first-child{border-top-left-radius:2px;border-top-right-radius:2px}.leaflet-touch .leaflet-bar a:last-child{border-bottom-left-radius:2px;border-bottom-right-radius:2px}.leaflet-control-zoom-in,.leaflet-control-zoom-out{font:bold 18px 'Lucida Console',Monaco,monospace;text-indent:1px}.leaflet-touch .leaflet-control-zoom-in,.leaflet-touch .leaflet-control-zoom-out{font-size:22px}.leaflet-control-layers{box-shadow:0 1px 5px rgba(0,0,0,.4);background:#fff;border-radius:5px}.leaflet-control-layers-toggle{background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAQAAAADQ4RFAAABaklEQVR4AcXWv2rDMBAG8O/MBuM3yOIXKGTOVNpBXiRLaM/u7uLBYPhLepFXSR+hJ3SIGzqkYMjQF0h3ECSD00CGQC/Qu+4G3cHd3d3dHd3d3V0GAAAAAAB8gW8gAAAAAACw1AkCAAAAAADAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABw1QkCAAAAAAAAAAAAAAAAAAAAwFQnCAAAAAAAAAAAAAAAAAAAAMBUJwgAAAAAAAAAAAAAAAAAAMBVJwgAAAAAAAAAAAAAAAAAAMBWJwgAAAAAAAAAAAAAAAAAAMBXJwgAAAAAAAAAAAAAAAAAAMBYJwgAAAAAAAAAAAAAAAAAAMBZJwgAAAAAAAAAAAAAAAAAAMBaJwgAAAAAAAAAAAAAAAAAAMBbJwgAAAAAAAAAAAAAAAAAAMBcJwgAAAAAAAAAAAAAAAAAAMBdJwgAAAAAAAAAAAAAAAAAAMBeJwgAAAAAAAAAAAAAAAAAAMBfJwgAAAAAAAAAAAAAAAAAAMBgJwgAAAAAAAAAAAAAAAAAAMBhJwgAAAAAAAAAAAAAAAAAAMBiJwgAAAAAAAAAAAAAAAAAAMBjJwgAAAAAAAAAAAAAAAAAAMBkJwgAAAAAAAAAAAAAAAAAAMBlJwg=);width:36px;height:36px}.leaflet-retina .leaflet-control-layers-toggle{background-size:26px 26px}.leaflet-touch .leaflet-control-layers-toggle{width:44px;height:44px}.leaflet-control-layers .leaflet-control-layers-list,.leaflet-control-layers-expanded .leaflet-control-layers-toggle{display:none}.leaflet-control-layers-expanded .leaflet-control-layers-list{display:block;position:relative}.leaflet-control-layers-expanded{padding:6px 10px 6px 6px;color:#333;background:#fff}.leaflet-control-layers-scrollbar{overflow-y:scroll;overflow-x:hidden;padding-right:5px}.leaflet-control-layers-selector{margin-top:2px;position:relative;top:1px}.leaflet-control-layers label{display:block;font-size:13px;font-size:1.08333em}.leaflet-control-layers-separator{height:0;border-top:1px solid #ddd;margin:5px -10px 5px -6px}.leaflet-default-icon-path{background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABkAAAApCAYAAADAk4LOAAAFgUlEQVR4Aa1XA5BjWRTN2oW17d3YaZtr2962HaZjqד)}
@@ -1774,10 +1775,27 @@ body.is-admin .admin-only { display: block !important; }
 .acct-tile.highlight .tile-value { color: var(--accent); }
 .acct-tile.warn .tile-value { color: #d97706; }
 
-.acct-charts-row { display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap; }
+.acct-charts-row { display:flex; gap:16px; flex-wrap:wrap; }
 .acct-chart-card { flex:2 1 320px; background:var(--paper); border:1px solid var(--border); border-radius:12px; padding:18px 20px; min-width:280px; }
 .acct-chart-card:last-child { flex:1 1 220px; }
-.acct-chart-title { font-size:13px; font-weight:700; color:var(--steel); margin-bottom:12px; letter-spacing:.02em; }
+.acct-chart-title { font-size:13px; font-weight:700; color:var(--steel); margin-bottom:2px; letter-spacing:.02em; }
+.acct-chart-sub { font-size:11px; color:var(--muted); margin-bottom:12px; }
+.acct-chart-header { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:4px; }
+.acct-chart-legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; }
+.acct-legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); }
+.acct-legend-dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; display:inline-block; }
+.acct-kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+@media(max-width:700px){ .acct-kpi-row { grid-template-columns:repeat(2,1fr); } }
+.acct-kpi { background:var(--paper); border:1px solid var(--border); border-radius:10px; padding:12px 16px; }
+.acct-kpi-label { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-bottom:4px; }
+.acct-kpi-value { font-size:22px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-0.5px; }
+.acct-kpi-delta { display:inline-flex; align-items:center; gap:3px; font-size:11px; font-weight:600; margin-top:4px; padding:2px 7px; border-radius:20px; }
+.acct-kpi-delta.up   { background:#d1fae5; color:#065f46; }
+.acct-kpi-delta.down { background:#fef3c7; color:#92400e; }
+.acct-kpi-delta.neu  { background:var(--border); color:var(--muted); }
+.acct-tab-pill { display:inline-flex; background:var(--surface,#f1f5f9); border-radius:20px; padding:2px; gap:2px; flex-shrink:0; }
+.acct-tp-btn { border:none; border-radius:20px; padding:3px 10px; font-size:11px; font-weight:600; cursor:pointer; transition:background .15s,color .15s; background:transparent; color:var(--muted); }
+.acct-tp-btn.active { background:var(--accent); color:#fff; }
 .acct-svg { width:100%; display:block; }
 
 .acct-tabs { display:flex; gap:2px; border-bottom:2px solid var(--border); margin-bottom:0; }
@@ -2088,27 +2106,94 @@ body.is-admin .admin-only { display: block !important; }
       <!-- Summary tiles -->
       <div class="acct-tiles" id="acct-tiles"></div>
 
-      <!-- Charts row -->
-      <div class="acct-charts-row">
-        <div class="acct-chart-card">
-          <div class="acct-chart-title">Monthly Income <span id="acct-year-label"></span></div>
-          <svg id="chart-monthly" class="acct-svg" viewBox="0 0 540 180" preserveAspectRatio="xMinYMin meet"></svg>
+      <!-- KPI tiles row (dynamic) -->
+      <div class="acct-kpi-row" id="acct-kpi-row"></div>
+
+      <!-- Monthly chart -->
+      <div class="acct-chart-card" style="margin-bottom:12px">
+        <div class="acct-chart-header">
+          <div>
+            <div class="acct-chart-title">Monthly Income <span id="acct-year-label"></span></div>
+            <div class="acct-chart-sub">Hover for details</div>
+          </div>
+          <div class="acct-tab-pill" id="monthTabPill">
+            <button class="acct-tp-btn active" onclick="switchMonthTab('grouped',this)">Grouped</button>
+            <button class="acct-tp-btn" onclick="switchMonthTab('stacked',this)">Stacked</button>
+            <button class="acct-tp-btn" onclick="switchMonthTab('line',this)">Trend</button>
+          </div>
         </div>
-        <div class="acct-chart-card">
-          <div class="acct-chart-title">Yearly Income</div>
-          <svg id="chart-yearly" class="acct-svg" viewBox="0 0 320 180" preserveAspectRatio="xMinYMin meet"></svg>
+        <div style="position:relative;height:200px"><canvas id="chart-monthly"></canvas></div>
+        <div class="acct-chart-legend">
+          <span class="acct-legend-item"><span class="acct-legend-dot" style="background:#2563eb"></span>Billed</span>
+          <span class="acct-legend-item"><span class="acct-legend-dot" style="background:#16a34a"></span>Collected</span>
+        </div>
+      </div>
+
+      <!-- Yearly + Collection Rate row -->
+      <div class="acct-charts-row" style="margin-bottom:12px">
+        <div class="acct-chart-card" style="flex:1;min-width:0">
+          <div class="acct-chart-header">
+            <div>
+              <div class="acct-chart-title">Yearly Income (5-Year)</div>
+              <div class="acct-chart-sub">Hover for year detail</div>
+            </div>
+          </div>
+          <div style="position:relative;height:180px"><canvas id="chart-yearly"></canvas></div>
+          <div class="acct-chart-legend">
+            <span class="acct-legend-item"><span class="acct-legend-dot" style="background:#2563eb"></span>Billed</span>
+            <span class="acct-legend-item"><span class="acct-legend-dot" style="background:#16a34a"></span>Collected</span>
+          </div>
+        </div>
+        <div class="acct-chart-card" style="flex:1;min-width:0">
+          <div class="acct-chart-header">
+            <div>
+              <div class="acct-chart-title">Collection Rate Trend</div>
+              <div class="acct-chart-sub">Monthly · 90% target</div>
+            </div>
+          </div>
+          <div style="position:relative;height:180px"><canvas id="chart-collection-rate"></canvas></div>
+          <div class="acct-chart-legend">
+            <span class="acct-legend-item"><span class="acct-legend-dot" style="background:#7c3aed"></span>Collection %</span>
+            <span class="acct-legend-item"><span class="acct-legend-dot" style="background:#d97706;border-radius:0;height:2px;width:16px;display:inline-block;margin-bottom:1px"></span>90% target</span>
+          </div>
         </div>
       </div>
 
       <!-- Open Invoice Charts by AMC / Lender -->
-      <div class="acct-charts-row" id="open-invoice-charts-row">
+      <div class="acct-charts-row" id="open-invoice-charts-row" style="margin-bottom:12px">
         <div class="acct-chart-card" style="flex:1;min-width:0">
-          <div class="acct-chart-title">Open Invoices by AMC</div>
-          <svg id="chart-open-amc" class="acct-svg acct-horiz-svg" viewBox="0 0 360 160" preserveAspectRatio="xMinYMin meet"></svg>
+          <div class="acct-chart-header">
+            <div>
+              <div class="acct-chart-title">Open Invoices by AMC</div>
+              <div class="acct-chart-sub">Hover for balance</div>
+            </div>
+          </div>
+          <div style="position:relative;height:200px"><canvas id="chart-open-amc"></canvas></div>
         </div>
         <div class="acct-chart-card" style="flex:1;min-width:0">
-          <div class="acct-chart-title">Open Invoices by Lender</div>
-          <svg id="chart-open-lender" class="acct-svg acct-horiz-svg" viewBox="0 0 360 160" preserveAspectRatio="xMinYMin meet"></svg>
+          <div class="acct-chart-header">
+            <div>
+              <div class="acct-chart-title">Open Invoices by Lender</div>
+              <div class="acct-chart-sub">Hover for balance</div>
+            </div>
+          </div>
+          <div style="position:relative;height:200px"><canvas id="chart-open-lender"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Aging Buckets chart -->
+      <div class="acct-chart-card" id="acct-aging-card" style="margin-bottom:12px;display:none">
+        <div class="acct-chart-header">
+          <div>
+            <div class="acct-chart-title">Invoice Aging Buckets</div>
+            <div class="acct-chart-sub">Days since order marked complete · open invoices only</div>
+          </div>
+        </div>
+        <div style="position:relative;height:160px"><canvas id="chart-aging"></canvas></div>
+        <div class="acct-chart-legend">
+          <span class="acct-legend-item"><span class="acct-legend-dot" style="background:#16a34a"></span>0–30 days</span>
+          <span class="acct-legend-item"><span class="acct-legend-dot" style="background:#d97706"></span>31–60 days</span>
+          <span class="acct-legend-item"><span class="acct-legend-dot" style="background:#dc2626"></span>60+ days</span>
         </div>
       </div>
 
@@ -8910,6 +8995,88 @@ function setAcctFilter(f, btn) {
   renderAccounting();
 }
 
+// ── Chart.js instance registry (destroy before redraw) ────────────────────
+const _acctCharts = {};
+function _acctChart(id, config) {
+  if (_acctCharts[id]) { _acctCharts[id].destroy(); delete _acctCharts[id]; }
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  _acctCharts[id] = new Chart(canvas.getContext('2d'), config);
+}
+
+// ── Monthly chart mode state ───────────────────────────────────────────────
+let _monthMode = 'grouped';
+let _monthBilledData = [];
+let _monthCollectedData = [];
+const _MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function switchMonthTab(mode, btn) {
+  _monthMode = mode;
+  document.querySelectorAll('.acct-tp-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  _drawMonthlyChart();
+}
+
+function _chartTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+    || (!document.documentElement.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  return {
+    fg:     isDark ? '#e2e8f0' : '#1a202c',
+    muted:  isDark ? '#94a3b8' : '#718096',
+    grid:   isDark ? '#334155' : '#e2e8f0',
+    surface: isDark ? '#1e293b' : '#ffffff',
+    border: isDark ? '#475569' : '#e2e8f0',
+  };
+}
+
+function _tooltipDefaults(tc) {
+  return {
+    backgroundColor: tc.surface,
+    titleColor: tc.fg,
+    bodyColor: tc.muted,
+    borderColor: tc.border,
+    borderWidth: 1,
+    padding: 10,
+  };
+}
+
+function _drawMonthlyChart() {
+  const tc = _chartTheme();
+  const mode = _monthMode;
+  const billed    = _monthBilledData;
+  const collected = _monthCollectedData;
+
+  let datasets;
+  if (mode === 'line') {
+    datasets = [
+      { label:'Billed',    data:billed,    borderColor:'#2563eb', backgroundColor:'rgba(37,99,235,0.08)', fill:true, tension:0.35, pointRadius:4, pointHoverRadius:7, borderWidth:2 },
+      { label:'Collected', data:collected, borderColor:'#16a34a', backgroundColor:'rgba(22,163,74,0.08)',  fill:true, tension:0.35, pointRadius:4, pointHoverRadius:7, borderWidth:2 },
+    ];
+  } else {
+    datasets = [
+      { label:'Billed',    data:billed,    backgroundColor:'rgba(37,99,235,0.85)', borderRadius:4, borderSkipped:false, stack: mode==='stacked'?'s':undefined },
+      { label:'Collected', data:collected, backgroundColor:'rgba(22,163,74,0.85)',  borderRadius:4, borderSkipped:false, stack: mode==='stacked'?'s':undefined },
+    ];
+  }
+
+  _acctChart('chart-monthly', {
+    type: mode === 'line' ? 'line' : 'bar',
+    data: { labels: _MONTH_LABELS, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      plugins: {
+        legend: { display:false },
+        tooltip: { ..._tooltipDefaults(tc), callbacks: { label: ctx => ` ${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString()}` } }
+      },
+      scales: {
+        x: { stacked: mode==='stacked', grid:{ color:tc.grid, drawTicks:false }, ticks:{ color:tc.muted } },
+        y: { stacked: mode==='stacked', grid:{ color:tc.grid }, ticks:{ color:tc.muted, callback: v => '$'+v.toLocaleString() } }
+      }
+    }
+  });
+}
+
 function renderAccounting() {
   const now = new Date();
   const thisYear = now.getFullYear();
@@ -8933,33 +9100,54 @@ function renderAccounting() {
   });
 
   const outstanding = totalBilled - totalCollected;
+  const collRate    = totalBilled > 0 ? Math.round(totalCollected / totalBilled * 1000) / 10 : 0;
+  const avgFee      = invoices.length ? Math.round(totalBilled / invoices.length) : 0;
 
-  // ── Tiles ──────────────────────────────────────────────────────────────
+  // ── Old tiles (keep for layout compat) ────────────────────────────────
   const tilesEl = document.getElementById('acct-tiles');
-  if (tilesEl) tilesEl.innerHTML = `
-    <div class="acct-tile highlight">
-      <div class="tile-label">Total Billed</div>
-      <div class="tile-value">$${totalBilled.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
-      <div class="tile-sub">${invoices.length} order${invoices.length!==1?'s':''}</div>
-    </div>
-    <div class="acct-tile">
-      <div class="tile-label">Collected</div>
-      <div class="tile-value">$${totalCollected.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
-      <div class="tile-sub">${Math.round(totalBilled>0?totalCollected/totalBilled*100:0)}% of billed</div>
-    </div>
-    <div class="acct-tile warn">
-      <div class="tile-label">Outstanding</div>
-      <div class="tile-value">$${outstanding.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
-      <div class="tile-sub">${openCount} open invoice${openCount!==1?'s':''}</div>
-    </div>
-    <div class="acct-tile">
-      <div class="tile-label">Avg Fee</div>
-      <div class="tile-value">$${invoices.length ? Math.round(totalBilled/invoices.length).toLocaleString() : '0'}</div>
-      <div class="tile-sub">per order</div>
-    </div>`;
+  if (tilesEl) tilesEl.style.display = 'none'; // replaced by KPI row
 
-  // ── Monthly chart (current year) ───────────────────────────────────────
-  const monthlyTotals = Array(12).fill(0);
+  // ── KPI Row ───────────────────────────────────────────────────────────
+  const kpiRow = document.getElementById('acct-kpi-row');
+  if (kpiRow) {
+    // Compare to same period last year
+    const lastYear = thisYear - 1;
+    let lyBilled = 0, lyCollected = 0;
+    invoices.forEach(o => {
+      const d = o.due || o.created || '';
+      if (d.startsWith(String(lastYear))) { lyBilled += o._fee; lyCollected += o._paid; }
+    });
+    const billedDelta    = lyBilled    > 0 ? Math.round((totalBilled    - lyBilled)    / lyBilled    * 100) : null;
+    const collectedDelta = lyCollected > 0 ? Math.round((totalCollected - lyCollected) / lyCollected * 100) : null;
+
+    const delta = (v, suffix='%') => v === null ? '' :
+      `<div class="acct-kpi-delta ${v>=0?'up':'down'}">${v>=0?'↑':'↓'} ${Math.abs(v)}${suffix} vs last year</div>`;
+
+    kpiRow.innerHTML = `
+      <div class="acct-kpi">
+        <div class="acct-kpi-label">Total Billed</div>
+        <div class="acct-kpi-value">$${totalBilled.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
+        ${delta(billedDelta)}
+      </div>
+      <div class="acct-kpi">
+        <div class="acct-kpi-label">Collected</div>
+        <div class="acct-kpi-value">$${totalCollected.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
+        ${delta(collectedDelta)}
+      </div>
+      <div class="acct-kpi">
+        <div class="acct-kpi-label">Open Invoices</div>
+        <div class="acct-kpi-value">$${outstanding.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
+        <div class="acct-kpi-delta ${openCount>0?'down':'neu'}">${openCount} order${openCount!==1?'s':''}</div>
+      </div>
+      <div class="acct-kpi">
+        <div class="acct-kpi-label">Collection Rate</div>
+        <div class="acct-kpi-value">${collRate}%</div>
+        <div class="acct-kpi-delta ${collRate>=90?'up':collRate>=80?'neu':'down'}">Avg fee $${avgFee.toLocaleString()}</div>
+      </div>`;
+  }
+
+  // ── Monthly chart data ─────────────────────────────────────────────────
+  const monthlyTotals    = Array(12).fill(0);
   const monthlyCollected = Array(12).fill(0);
   invoices.forEach(o => {
     const d = o.due || o.created || '';
@@ -8970,50 +9158,128 @@ function renderAccounting() {
     monthlyTotals[mo]    += o._fee;
     monthlyCollected[mo] += o._paid;
   });
-  drawBarChart('chart-monthly', monthlyTotals, monthlyCollected,
-    ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-    540, 180);
+  _monthBilledData    = monthlyTotals;
+  _monthCollectedData = monthlyCollected;
+  _drawMonthlyChart();
+
   const yearLabel = document.getElementById('acct-year-label');
   if (yearLabel) yearLabel.textContent = thisYear;
 
-  // ── Yearly chart (last 5 years) ────────────────────────────────────────
+  // ── Yearly chart ───────────────────────────────────────────────────────
   const years = [];
   for (let y = thisYear - 4; y <= thisYear; y++) years.push(y);
-  const yearlyTotals    = years.map(y => invoices.filter(o => {
-    const d = o.due || o.created || ''; return d.startsWith(String(y));
-  }).reduce((s,o) => s + o._fee, 0));
-  const yearlyCollected = years.map(y => invoices.filter(o => {
-    const d = o.due || o.created || ''; return d.startsWith(String(y));
-  }).reduce((s,o) => s + o._paid, 0));
-  drawBarChart('chart-yearly', yearlyTotals, yearlyCollected,
-    years.map(String), 320, 180);
+  const yearlyTotals    = years.map(y => invoices.filter(o => { const d = o.due||o.created||''; return d.startsWith(String(y)); }).reduce((s,o)=>s+o._fee,0));
+  const yearlyCollected = years.map(y => invoices.filter(o => { const d = o.due||o.created||''; return d.startsWith(String(y)); }).reduce((s,o)=>s+o._paid,0));
+  {
+    const tc = _chartTheme();
+    _acctChart('chart-yearly', {
+      type:'bar',
+      data:{ labels:years.map(String), datasets:[
+        { label:'Billed',    data:yearlyTotals,    backgroundColor:'rgba(37,99,235,0.85)', borderRadius:4, borderSkipped:false },
+        { label:'Collected', data:yearlyCollected, backgroundColor:'rgba(22,163,74,0.85)',  borderRadius:4, borderSkipped:false },
+      ]},
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        interaction:{ mode:'index', intersect:false },
+        plugins:{ legend:{ display:false }, tooltip:{ ..._tooltipDefaults(tc), callbacks:{ label: ctx=>` ${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString()}` } } },
+        scales:{ x:{ grid:{ color:tc.grid, drawTicks:false }, ticks:{ color:tc.muted } }, y:{ grid:{ color:tc.grid }, ticks:{ color:tc.muted, callback:v=>'$'+v.toLocaleString() } } }
+      }
+    });
+  }
+
+  // ── Collection Rate Trend ──────────────────────────────────────────────
+  {
+    const tc = _chartTheme();
+    // Per-month collection rate for current year
+    const rateData = monthlyTotals.map((b,i) => b > 0 ? Math.round(monthlyCollected[i]/b*1000)/10 : null);
+    _acctChart('chart-collection-rate', {
+      type:'line',
+      data:{ labels:_MONTH_LABELS, datasets:[
+        { label:'Collection Rate', data:rateData, borderColor:'#7c3aed', backgroundColor:'rgba(124,58,237,0.07)', fill:true, tension:0.35, pointRadius:4, pointHoverRadius:7, borderWidth:2, pointBackgroundColor:'#7c3aed', spanGaps:false },
+        { label:'Target (90%)', data:Array(12).fill(90), borderColor:'rgba(217,119,6,0.55)', borderDash:[5,4], borderWidth:1.5, pointRadius:0, fill:false },
+      ]},
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        interaction:{ mode:'index', intersect:false },
+        plugins:{ legend:{ display:false }, tooltip:{ ..._tooltipDefaults(tc), callbacks:{ label: ctx => ctx.parsed.y !== null ? ` ${ctx.dataset.label}: ${ctx.parsed.y}%` : '' } } },
+        scales:{ x:{ grid:{ color:tc.grid, drawTicks:false }, ticks:{ color:tc.muted } }, y:{ min:0, max:100, grid:{ color:tc.grid }, ticks:{ color:tc.muted, callback:v=>v+'%' } } }
+      }
+    });
+  }
 
   // ── Open invoice charts by AMC and Lender ─────────────────────────────
   const openInvoices = invoices.filter(o => o._balance > 0);
 
-  // Group by AMC
+  function _drawHorizInvoiceChart(canvasId, groupMap, label) {
+    const tc = _chartTheme();
+    const data = Object.values(groupMap).sort((a,b)=>b.balance-a.balance).slice(0,8);
+    if (!data.length) { _acctChart(canvasId, { type:'bar', data:{labels:['No open invoices'],datasets:[{data:[0]}]}, options:{plugins:{legend:{display:false}}} }); return; }
+    _acctChart(canvasId, {
+      type:'bar',
+      data:{ labels:data.map(d=>d.name.length>18?d.name.slice(0,17)+'…':d.name), datasets:[{
+        label:'Open Balance', data:data.map(d=>d.balance),
+        backgroundColor:'rgba(217,119,6,0.85)', borderRadius:4, borderSkipped:false,
+      }]},
+      options:{
+        indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display:false }, tooltip:{ ..._tooltipDefaults(tc), callbacks:{ label: ctx => ` $${ctx.parsed.x.toLocaleString()} · ${data[ctx.dataIndex].count} order${data[ctx.dataIndex].count!==1?'s':''}` } } },
+        scales:{ x:{ grid:{ color:tc.grid }, ticks:{ color:tc.muted, callback:v=>'$'+v.toLocaleString() } }, y:{ grid:{ display:false }, ticks:{ color:tc.muted } } }
+      }
+    });
+  }
+
   const amcMap = {};
   openInvoices.forEach(o => {
-    const key = (o.amc || '(No AMC)').trim() || '(No AMC)';
-    if (!amcMap[key]) amcMap[key] = { name: key, balance: 0, count: 0 };
-    amcMap[key].balance += o._balance;
-    amcMap[key].count++;
+    const key = (o.amc||'(No AMC)').trim()||'(No AMC)';
+    if (!amcMap[key]) amcMap[key] = { name:key, balance:0, count:0 };
+    amcMap[key].balance += o._balance; amcMap[key].count++;
   });
-  drawHorizBarChart('chart-open-amc', Object.values(amcMap), 360, 160);
+  _drawHorizInvoiceChart('chart-open-amc', amcMap, 'AMC');
 
-  // Group by Lender
   const lenderMap = {};
   openInvoices.forEach(o => {
-    const key = (o.lender || '(No Lender)').trim() || '(No Lender)';
-    if (!lenderMap[key]) lenderMap[key] = { name: key, balance: 0, count: 0 };
-    lenderMap[key].balance += o._balance;
-    lenderMap[key].count++;
+    const key = (o.lender||'(No Lender)').trim()||'(No Lender)';
+    if (!lenderMap[key]) lenderMap[key] = { name:key, balance:0, count:0 };
+    lenderMap[key].balance += o._balance; lenderMap[key].count++;
   });
-  drawHorizBarChart('chart-open-lender', Object.values(lenderMap), 360, 160);
+  _drawHorizInvoiceChart('chart-open-lender', lenderMap, 'Lender');
 
-  // Show/hide the open invoice charts row
   const oiRow = document.getElementById('open-invoice-charts-row');
   if (oiRow) oiRow.style.display = openInvoices.length ? '' : 'none';
+
+  // ── Aging Buckets (60-day trigger from completedAt) ────────────────────
+  {
+    const tc = _chartTheme();
+    const today = new Date(); today.setHours(0,0,0,0);
+    const ageBuckets = { a0:0, a30:0, a60:0 }; // 0-30, 31-60, 60+
+    openInvoices.forEach(o => {
+      const completedDate = o.orderSent || o.due || o.created || '';
+      if (!completedDate) return;
+      const d = new Date(completedDate); d.setHours(0,0,0,0);
+      const age = Math.round((today - d) / 86400000);
+      if (age <= 30)      ageBuckets.a0  += o._balance;
+      else if (age <= 60) ageBuckets.a30 += o._balance;
+      else                ageBuckets.a60 += o._balance;
+    });
+    const agingCard = document.getElementById('acct-aging-card');
+    if (agingCard) {
+      agingCard.style.display = openInvoices.length ? '' : 'none';
+      _acctChart('chart-aging', {
+        type:'bar',
+        data:{ labels:['0–30 days','31–60 days','60+ days'], datasets:[{
+          label:'Open Balance',
+          data:[ageBuckets.a0, ageBuckets.a30, ageBuckets.a60],
+          backgroundColor:['rgba(22,163,74,0.85)','rgba(217,119,6,0.85)','rgba(220,38,38,0.85)'],
+          borderRadius:4, borderSkipped:false,
+        }]},
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{ display:false }, tooltip:{ ..._tooltipDefaults(tc), callbacks:{ label: ctx => ` $${ctx.parsed.y.toLocaleString()}` } } },
+          scales:{ x:{ grid:{ color:tc.grid, drawTicks:false }, ticks:{ color:tc.muted } }, y:{ grid:{ color:tc.grid }, ticks:{ color:tc.muted, callback:v=>'$'+v.toLocaleString() } } }
+        }
+      });
+    }
+  }
 
   // ── Invoice table ──────────────────────────────────────────────────────
   const filtered = invoices.filter(o => {
