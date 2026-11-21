@@ -3540,7 +3540,7 @@ function seedData() {
   function daysFromNow(n) {
     const d = new Date(today);
     d.setDate(d.getDate() + n);
-    return d.toISOString().slice(0,10);
+    return localDateStr(d);
   }
   orders = [
     { id:uid(), address:'245 West 72nd St, Apt 4B, New York, NY 10023', client:'James Morrison', phone:'(212) 555-1001', email:'jmorrison@email.com', lender:'Chase Bank', amc:'Nationwide AMC', type:'1073', purpose:'Purchase', fee:750, due:daysFromNow(3), inspection:daysFromNow(-2), status:'review', notes:'Coop unit. Needs financials.', created:new Date(today.getTime()-86400000*5).toISOString(), appraiserId:ap0 },
@@ -3582,6 +3582,12 @@ let calYear, calMonth;
 // ══════════════════════════════════════════
 // UTILS
 // ══════════════════════════════════════════
+// Returns today's date as YYYY-MM-DD in local time (not UTC)
+function localDateStr(d) {
+  const dt = d || new Date();
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
@@ -3923,7 +3929,7 @@ function showPage(name) {
     renderClientReportEntityList();
     // Default date-to to today if not set
     const dtTo = document.getElementById('rpt-date-to');
-    if (dtTo && !dtTo.value) dtTo.value = new Date().toISOString().slice(0,10);
+    if (dtTo && !dtTo.value) dtTo.value = localDateStr();
   }
   if (name === 'settings') renderSettings();
 }
@@ -4084,7 +4090,7 @@ function onSearch(val) {
 
 function renderOrders() {
   const list  = sortedOrders(filteredOrders());
-  const today = new Date().toISOString().slice(0,10);
+  const today = localDateStr();
 
   document.getElementById('orders-count').textContent =
     list.length + ' order' + (list.length !== 1 ? 's' : '');
@@ -4397,7 +4403,7 @@ function showInspectionPopup(orderId, onSave) {
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:5000;display:flex;align-items:center;justify-content:center';
 
-  const today = new Date().toISOString().slice(0,10);
+  const today = localDateStr();
   const existingDate = o.inspection || '';
   const existingTime = o.inspectionTime || '';
 
@@ -4778,7 +4784,7 @@ function _autoSaveNow() {
       const val = document.getElementById('f-order-sent').value;
       const st  = document.getElementById('f-status').value;
       if (st === 'complete' && !val) {
-        const today = new Date().toISOString().slice(0,10);
+        const today = localDateStr();
         document.getElementById('f-order-sent').value = today;
         return today;
       }
@@ -4928,7 +4934,7 @@ function saveOrder() {
       const val = document.getElementById('f-order-sent').value;
       const st  = document.getElementById('f-status').value;
       if (st === 'complete' && !val) {
-        const today = new Date().toISOString().slice(0,10);
+        const today = localDateStr();
         document.getElementById('f-order-sent').value = today;
         return today;
       }
@@ -5153,7 +5159,7 @@ function closeAllAC() {
 // PAYMENT MODAL
 // ══════════════════════════════════════════
 function openPaymentModal(orderId) {
-  const today = new Date().toISOString().slice(0,10);
+  const today = localDateStr();
   const mo = document.getElementById('pay-modal-overlay');
   document.getElementById('pay-order-id').value = orderId;
   document.getElementById('pay-amount').value   = '';
@@ -5334,7 +5340,7 @@ function renderCalendar() {
   const visible = calFilteredOrders();
   const firstDay = new Date(calYear, calMonth, 1).getDay();
   const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
-  const todayStr = new Date().toISOString().slice(0,10);
+  const todayStr = localDateStr();
 
   // Build event map from filtered orders
   const evMap = {};
@@ -5933,7 +5939,7 @@ function saveAscAppraisalUpdate(apId) {
   const newLic    = (document.getElementById(`ap-upd-lic-${apId}`)?.value  || '').trim();
   const newExp    = document.getElementById(`ap-upd-exp-${apId}`)?.value   || '';
   const newType   = (document.getElementById(`ap-upd-type-${apId}`)?.value || '').trim();
-  const today     = new Date().toISOString().slice(0,10);
+  const today     = localDateStr();
 
   Object.assign(a, {
     license:          newLic  || a.license,
@@ -5955,7 +5961,7 @@ function saveAscAmcUpdate(amcId) {
 
   const newLic    = (document.getElementById(`amc-upd-lic-${amcId}`)?.value || '').trim();
   const newExp    = document.getElementById(`amc-upd-exp-${amcId}`)?.value  || '';
-  const today     = new Date().toISOString().slice(0,10);
+  const today     = localDateStr();
 
   Object.assign(c, {
     amclic:           newLic || c.amclic,
@@ -8978,7 +8984,7 @@ function setApPayFilter(f, btn) {
 function markAppraiserPaid(orderId, paid) {
   const o = orders.find(x => x.id === orderId);
   if (!o) return;
-  o.appraiserPaid = paid ? new Date().toISOString().slice(0,10) : null;
+  o.appraiserPaid = paid ? localDateStr() : null;
   _sbUpsertOrder(o);
   openDetail(orderId);
   renderAppraisalPayments();
@@ -10784,7 +10790,7 @@ async function writeBackupToFolder() {
     if (perm !== 'granted') { toast('⚠ Folder permission denied — backup skipped'); return false; }
     const payload = { exportedAt: new Date().toISOString(), version: 1, orders, appraisers, amcs, lenders };
     const json = JSON.stringify(payload, null, 2);
-    const date = new Date().toISOString().slice(0,10);
+    const date = localDateStr();
     const fname = `AppraisalDesk_backup_${date}.json`;
     const fileHandle = await _backupDirHandle.getFileHandle(fname, { create: true });
     const writable = await fileHandle.createWritable();
@@ -10814,7 +10820,7 @@ async function manualBackupNow() {
 
 // Save full app HTML + embedded data — opens in new tab, use Ctrl+S / File→Save As
 async function saveAppToHardDrive() {
-  const date = new Date().toISOString().slice(0,10);
+  const date = localDateStr();
   const fname = `AppraisalDesk_${date}.html`;
   const dataPayload = {
     [ORDERS_KEY]:   JSON.stringify(orders),
@@ -10876,7 +10882,7 @@ async function saveAppToHardDrive() {
 async function saveJsonToHardDrive() {
   const payload = { exportedAt: new Date().toISOString(), version: 1, orders, appraisers, amcs, lenders };
   const json = JSON.stringify(payload, null, 2);
-  const date = new Date().toISOString().slice(0,10);
+  const date = localDateStr();
   const fname = `AppraisalDesk_backup_${date}.json`;
 
   // Try downloads capability first
