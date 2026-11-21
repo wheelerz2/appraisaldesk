@@ -2164,7 +2164,7 @@ body.is-admin .admin-only { display: block !important; }
         <div class="acct-chart-card" style="flex:1;min-width:0">
           <div class="acct-chart-header">
             <div>
-              <div class="acct-chart-title">Open Invoices by AMC</div>
+              <div class="acct-chart-title">Open Invoices by AMC / Lender</div>
               <div class="acct-chart-sub">Hover for balance</div>
             </div>
           </div>
@@ -9230,7 +9230,7 @@ function renderAccounting() {
 
   const amcMap = {};
   openInvoices.forEach(o => {
-    const key = (o.amc||'(No AMC)').trim()||'(No AMC)';
+    const key = ((o.amc||'').trim()) || ((o.lender||'').trim()) || '(No AMC / Lender)';
     if (!amcMap[key]) amcMap[key] = { name:key, balance:0, count:0 };
     amcMap[key].balance += o._balance; amcMap[key].count++;
   });
@@ -9238,7 +9238,7 @@ function renderAccounting() {
 
   const lenderMap = {};
   openInvoices.forEach(o => {
-    const key = (o.lender||'(No Lender)').trim()||'(No Lender)';
+    const key = (o.lender||'').trim() || '(No Lender)';
     if (!lenderMap[key]) lenderMap[key] = { name:key, balance:0, count:0 };
     lenderMap[key].balance += o._balance; lenderMap[key].count++;
   });
