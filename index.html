@@ -2169,11 +2169,19 @@ body.is-admin .admin-only { display: block !important; }
         <button class="acct-tab" id="ap-pay-tab-all"    onclick="setApPayFilter('all',this)">All</button>
       </div>
 
+      <!-- Bulk action bar -->
+      <div id="ap-pay-bulk-bar" style="display:none;align-items:center;gap:10px;margin-top:12px;padding:10px 14px;background:var(--accent-muted,#e8f0fe);border:1px solid var(--accent);border-radius:8px">
+        <span style="font-size:13px;font-weight:600;color:var(--accent)">Bulk Actions:</span>
+        <button class="btn-primary" style="font-size:13px;padding:5px 14px" onclick="markSelectedAppraiserPaid()">✓ Mark Selected as Paid</button>
+        <span style="font-size:12px;color:var(--text-muted)">— select rows below then click</span>
+      </div>
+
       <!-- Appraiser payment table -->
-      <div class="income-table-wrap" style="margin-top:0">
+      <div class="income-table-wrap" style="margin-top:8px">
         <table class="income-table acct-invoice-table">
           <thead>
             <tr>
+              <th id="ap-pay-th-chk" style="width:32px;text-align:center"><input type="checkbox" id="ap-pay-select-all" onchange="apPaySelectAll(this)" style="width:15px;height:15px;cursor:pointer" title="Select all unpaid"></th>
               <th>Submitted</th>
               <th>Address</th>
               <th>Appraiser</th>
@@ -8990,6 +8998,24 @@ function markAppraiserPaid(orderId, paid) {
   renderAppraisalPayments();
 }
 
+function markSelectedAppraiserPaid() {
+  const checkboxes = document.querySelectorAll('.ap-pay-chk:checked');
+  if (!checkboxes.length) { toast('No orders selected'); return; }
+  checkboxes.forEach(cb => {
+    const o = orders.find(x => x.id === cb.dataset.id);
+    if (o && !o.appraiserPaid) {
+      o.appraiserPaid = localDateStr();
+      _sbUpsertOrder(o);
+    }
+  });
+  renderAppraisalPayments();
+  toast(`Marked ${checkboxes.length} order${checkboxes.length!==1?'s':''} as paid`);
+}
+
+function apPaySelectAll(el) {
+  document.querySelectorAll('.ap-pay-chk').forEach(cb => cb.checked = el.checked);
+}
+
 function renderAppraisalPayments() {
   // Populate appraiser dropdown
   const sel = document.getElementById('ap-pay-appraiser');
@@ -9039,17 +9065,32 @@ function renderAppraisalPayments() {
     <div class="acct-tile warn"><div class="tile-label">Unpaid</div><div class="tile-value">$${unpaidEarnings.toLocaleString()}</div><div class="tile-sub">${unpaidCount} invoice${unpaidCount!==1?'s':''}</div></div>
     <div class="acct-tile highlight"><div class="tile-label">Paid Out</div><div class="tile-value">$${paidEarnings.toLocaleString()}</div><div class="tile-sub">${allForAp.filter(o=>o.appraiserPaid).length} paid</div></div>`;
 
+  // Bulk action bar
+  const hasUnpaid = filtered.some(o => !o.appraiserPaid);
+  const bulkBar = document.getElementById('ap-pay-bulk-bar');
+  if (bulkBar) {
+    bulkBar.style.display = hasUnpaid ? 'flex' : 'none';
+  }
+
   // Table
   const tbody = document.getElementById('ap-pay-tbody');
   if (!tbody) return;
+  // Update thead checkbox column visibility
+  const thChk = document.getElementById('ap-pay-th-chk');
+  if (thChk) thChk.style.display = hasUnpaid ? '' : 'none';
+
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="9" class="income-empty">No records match</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="income-empty">No records match</td></tr>`;
     return;
   }
   tbody.innerHTML = filtered.map(o => {
     const earn = Math.round(o.fee * ((o.feeSplit!=null?o.feeSplit:100)/100));
     const isPaid = !!o.appraiserPaid;
+    const chkCell = hasUnpaid
+      ? `<td style="width:32px;text-align:center">${!isPaid ? `<input type="checkbox" class="ap-pay-chk" data-id="${o.id}" style="width:15px;height:15px;cursor:pointer">` : ''}</td>`
+      : '';
     return `<tr>
+      ${chkCell}
       <td>${o.orderSent ? fmt(o.orderSent) : (o.due ? fmt(o.due) : '—')}</td>
       <td style="cursor:pointer;color:var(--accent)" onclick="showPage('orders');setTimeout(()=>openDetail('${o.id}'),80)">${esc(o.address||'—')}</td>
       <td>${esc(apName(o.appraiserId))}</td>
