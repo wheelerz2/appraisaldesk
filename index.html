@@ -3867,9 +3867,28 @@ function renderDashboard() {
     ? `<div class="dash-empty">No overdue orders ✓</div>`
     : overdue.map(o => dueRow(o, true)).join('');
 
+  function readyRow(o) {
+    const color = apColor(o.appraiserId);
+    const addr  = o.address || '(No address)';
+    const sc    = STATUS_COLOR[o.status] || '#6b7280';
+    const ap    = apName(o.appraiserId);
+    const client= o.amc || o.lender || '';
+    return `<div class="dash-row" onclick="openDetail('${esc(o.id)}')">
+      <div class="dash-row-bar" style="background:${color}"></div>
+      <div class="dash-row-inner">
+        <div class="dash-row-addr" title="${esc(addr)}">${esc(addr)}</div>
+        <div class="dash-row-meta">
+          <span class="dash-row-ap"><span class="dash-row-dot" style="background:${color}"></span>${esc(ap)}</span>
+          ${o.due ? `<span>· Due ${esc(o.due)}</span>` : ''}
+          ${client ? `<span>· ${esc(client)}</span>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }
+
   const readyRows = readyToWrite.length === 0
     ? `<div class="dash-empty">No inspected orders waiting to write</div>`
-    : readyToWrite.map(unschRow).join('');
+    : readyToWrite.map(readyRow).join('');
 
   const qstnRows = waitingQstn.map(unschRow).join('');
 
