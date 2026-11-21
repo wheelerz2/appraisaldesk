@@ -7858,7 +7858,7 @@ function extractOrderData(raw) {
     //   pdftotext: "Property   228 Hancock Street\nAddress:   Brooklyn, NY 11216"
     //   PDF.js:    "Property\n228 Hancock Street\nAddress:\nBrooklyn, NY 11216"
     const nhaAddrSplitM = text.match(
-      /Property\s*(?:\s{2,}([^\n\r]+)|\n\s*([^\n\r]+))\n[^\n\r]*Address:\s*(?:\s{2,}([^\n\r]+)|\n\s*([^\n\r]+))/i
+      /Property\s*(?:\s+(\d[^\n\r]+)|\n\s*([^\n\r]+))\n[^\n\r]*Address:\s*(?:\s+([^\n\r]+)|\n\s*([^\n\r]+))/i
     );
     if (nhaAddrSplitM) {
       const street = (nhaAddrSplitM[1] || nhaAddrSplitM[2] || '').trim();
