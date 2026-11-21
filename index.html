@@ -3724,7 +3724,7 @@ function renderDashboard() {
   const todayInsp   = myOrders.filter(o => o.inspection === todayStr).sort(byTime);
   const tomorrowInsp= myOrders.filter(o => o.inspection === tomorrowStr).sort(byTime);
   const unscheduled    = myOrders.filter(o => isOpen(o) && !o.inspection && o.status !== 'onhold');
-  const readyToWrite   = myOrders.filter(o => o.status === 'inspected');
+  const readyToWrite   = myOrders.filter(o => o.status === 'inspected').sort((a,b) => (a.due||'').localeCompare(b.due||''));
   const waitingQstn    = myOrders.filter(o => o.status === 'questionnaire');
   const openAll        = myOrders.filter(isOpen);
 
