@@ -851,6 +851,7 @@ body.is-admin .admin-only { display: block !important; }
 }
 .dash-panel-count.zero { background:var(--border); color:var(--muted); }
 .dash-panel-body { overflow-y:auto; max-height:340px; }
+.dash-panel-body.no-max { max-height:none; overflow-y:visible; }
 
 /* compact row cards */
 .dash-row {
@@ -3722,8 +3723,10 @@ function renderDashboard() {
 
   const todayInsp   = myOrders.filter(o => o.inspection === todayStr).sort(byTime);
   const tomorrowInsp= myOrders.filter(o => o.inspection === tomorrowStr).sort(byTime);
-  const unscheduled = myOrders.filter(o => isOpen(o) && !o.inspection && o.status !== 'onhold');
-  const openAll     = myOrders.filter(isOpen);
+  const unscheduled    = myOrders.filter(o => isOpen(o) && !o.inspection && o.status !== 'onhold');
+  const readyToWrite   = myOrders.filter(o => o.status === 'inspected');
+  const waitingQstn    = myOrders.filter(o => o.status === 'questionnaire');
+  const openAll        = myOrders.filter(isOpen);
 
   // ── STAT TILES ────────────────────────────────────────────────────────────
   const dueToday  = myOrders.filter(o => o.due === todayStr && isOpen(o) && o.status !== 'onhold');
@@ -3864,15 +3867,31 @@ function renderDashboard() {
     ? `<div class="dash-empty">No overdue orders ✓</div>`
     : overdue.map(o => dueRow(o, true)).join('');
 
+  const readyRows = readyToWrite.length === 0
+    ? `<div class="dash-empty">No inspected orders waiting to write</div>`
+    : readyToWrite.map(unschRow).join('');
+
+  const qstnRows = waitingQstn.map(unschRow).join('');
+
   body.innerHTML = `
     <div id="dash-cols">
-      <div class="dash-panel">
-        <div class="dash-panel-head">
-          <span class="dash-panel-icon">🔍</span>
-          <span class="dash-panel-title">Today's Inspections</span>
-          <span class="dash-panel-count${todayInsp.length===0?' zero':''}">${todayInsp.length}</span>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="dash-panel">
+          <div class="dash-panel-head">
+            <span class="dash-panel-icon">🔍</span>
+            <span class="dash-panel-title">Today's Inspections</span>
+            <span class="dash-panel-count${todayInsp.length===0?' zero':''}">${todayInsp.length}</span>
+          </div>
+          <div class="dash-panel-body">${todayRows}</div>
         </div>
-        <div class="dash-panel-body">${todayRows}</div>
+        <div class="dash-panel">
+          <div class="dash-panel-head">
+            <span class="dash-panel-icon">✍️</span>
+            <span class="dash-panel-title">Ready to Write</span>
+            <span class="dash-panel-count${readyToWrite.length===0?' zero':''}">${readyToWrite.length}</span>
+          </div>
+          <div class="dash-panel-body">${readyRows}</div>
+        </div>
       </div>
       <div class="dash-panel">
         <div class="dash-panel-head">
@@ -3880,7 +3899,7 @@ function renderDashboard() {
           <span class="dash-panel-title">Needs Scheduling</span>
           <span class="dash-panel-count${unscheduled.length===0?' zero':''}">${unscheduled.length}</span>
         </div>
-        <div class="dash-panel-body">${unschRows}</div>
+        <div class="dash-panel-body no-max">${unschRows}</div>
       </div>
     </div>
     <div id="dash-bottom">
@@ -3909,6 +3928,15 @@ function renderDashboard() {
           </div>
           <div class="dash-panel-body">${overdueRows}</div>
         </div>
+        ${waitingQstn.length > 0 ? `
+        <div class="dash-panel">
+          <div class="dash-panel-head">
+            <span class="dash-panel-icon">📝</span>
+            <span class="dash-panel-title">Waiting for Questionnaire</span>
+            <span class="dash-panel-count" style="background:var(--s-questionnaire)">${waitingQstn.length}</span>
+          </div>
+          <div class="dash-panel-body">${qstnRows}</div>
+        </div>` : ''}
       </div>
     </div>
   `;
