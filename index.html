@@ -6309,7 +6309,7 @@ function setCoTab(tab) {
 function renderCompanies() {
   const q  = (document.getElementById('co-search')?.value || '').toLowerCase();
   const db = coTab === 'amc' ? amcs : lenders;
-  const list = db.filter(c => !q || c.name.toLowerCase().includes(q) || (c.contact||'').toLowerCase().includes(q));
+  const list = db.filter(c => !q || c.name.toLowerCase().includes(q) || (c.contact||'').toLowerCase().includes(q)).sort((a,b) => (a.name||'').localeCompare(b.name||''));
   const isAmc = coTab === 'amc';
 
   // Show/hide AMC license column
