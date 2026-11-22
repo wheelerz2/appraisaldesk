@@ -11656,7 +11656,7 @@ function printInvoice(orderId) {
             <td style="padding:8px 12px;font-size:13px">Total Fee</td>
             <td style="padding:8px 12px;font-size:13px;font-weight:600;text-align:right">$${fee.toFixed(2)}</td>
           </tr>
-          ${o.feeSplit != null && o.feeSplit !== 100 ? `<tr><td style="padding:8px 12px;font-size:13px;color:#6b7280">Appraiser Earns (${split}%)</td><td style="padding:8px 12px;font-size:13px;text-align:right">$${earns.toFixed(2)}</td></tr>` : ''}
+
           <tr>
             <td style="padding:8px 12px;font-size:13px;color:#6b7280">Paid to Date</td>
             <td style="padding:8px 12px;font-size:13px;text-align:right">$${paidTotal.toFixed(2)}</td>
