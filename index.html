@@ -1970,9 +1970,34 @@ body.is-admin .admin-only { display: block !important; }
     <div class="main-content">
       <div class="page-header">
         <h2>Appraisers</h2>
-        <button class="btn-add" onclick="openAppraiserModal(null)">+ Add Appraiser</button>
+        <button class="btn-add admin-only" onclick="openAppraiserModal(null)">+ Add Appraiser</button>
       </div>
-      <div class="appraiser-grid" id="appraiser-grid"></div>
+      <!-- Page-level tabs: Team / AMCs / Lenders -->
+      <div class="co-tabs" id="ap-page-tabs">
+        <button class="co-tab active" id="ap-tab-team"   onclick="setApPageTab('team')">Team</button>
+        <button class="co-tab"        id="ap-tab-amc"    onclick="setApPageTab('amc')">AMCs</button>
+        <button class="co-tab"        id="ap-tab-lender" onclick="setApPageTab('lender')">Lenders</button>
+      </div>
+      <!-- Team grid -->
+      <div id="ap-team-section">
+        <div class="appraiser-grid" id="appraiser-grid"></div>
+      </div>
+      <!-- Companies read-only view -->
+      <div id="ap-co-section" style="display:none">
+        <div class="co-toolbar">
+          <input class="co-search" type="search" placeholder="Search…" id="ap-co-search" oninput="renderApCoList()">
+        </div>
+        <div class="co-table-wrap">
+          <table class="co-table">
+            <thead>
+              <tr>
+                <th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Website</th><th id="ap-co-th-lic" style="display:none">AMC License</th><th>Orders</th>
+              </tr>
+            </thead>
+            <tbody id="ap-co-tbody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2941,6 +2966,19 @@ body.is-admin .admin-only { display: block !important; }
         </div>
         <div class="field" style="display:flex;align-items:flex-end;padding-bottom:2px">
           <div id="ap-split-hint" style="font-size:12px;color:var(--muted);line-height:1.4">Auto-fills the split on new orders when this appraiser is assigned.</div>
+        </div>
+      </div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);border-top:1px solid var(--border);padding-top:12px">Dashboard Color</div>
+      <div class="form-row">
+        <div class="field">
+          <label>Color tab &amp; stripe throughout dashboard</label>
+          <div style="display:flex;align-items:center;gap:10px">
+            <input type="color" id="ap-color" style="width:44px;height:36px;padding:2px 4px;border-radius:6px;border:1px solid var(--border);background:var(--card);cursor:pointer">
+            <div id="ap-color-swatches" style="display:flex;gap:6px;flex-wrap:wrap">
+              <!-- palette swatches injected by JS -->
+            </div>
+            <button type="button" onclick="_apColorReset()" id="ap-color-reset-btn" style="display:none;font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--hover);color:var(--muted);cursor:pointer">Reset to default</button>
+          </div>
         </div>
       </div>
       <div class="field"><label>Notes / Specialties</label><textarea id="ap-notes" style="min-height:56px" placeholder="Specialties, certifications, coverage areas…"></textarea></div>
@@ -4086,7 +4124,7 @@ function showPage(name) {
   if (name === 'orders') { buildSidebarFilters(); renderOrders(); }
   if (name === 'map') renderMapPage();
   if (name === 'calendar') renderCalendar();
-  if (name === 'appraisers') { populateAppraisersSelect(); renderAppraisers(); }
+  if (name === 'appraisers') { populateAppraisersSelect(); renderAppraisers(); setApPageTab('team'); }
   if (name === 'companies') renderCompanies();
   if (name === 'income') renderIncome();
   if (name === 'accounting') {
@@ -5410,8 +5448,71 @@ const AP_COLOR_UNASSIGNED = '#8a7f6e';
 
 function apColor(appraiserId) {
   if (!appraiserId) return AP_COLOR_UNASSIGNED;
-  const idx = appraisers.findIndex(a => a.id === appraiserId);
-  return idx >= 0 ? AP_COLORS[idx % AP_COLORS.length] : AP_COLOR_UNASSIGNED;
+  const ap = appraisers.find(a => a.id === appraiserId);
+  if (!ap) return AP_COLOR_UNASSIGNED;
+  if (ap.color) return ap.color;
+  const idx = appraisers.indexOf(ap);
+  return AP_COLORS[idx % AP_COLORS.length];
+}
+
+let _apColorDefaultHex = '';
+
+function _apColorReset() {
+  const inp = document.getElementById('ap-color');
+  if (!inp) return;
+  inp.value = _apColorDefaultHex;
+  inp.dispatchEvent(new Event('input'));
+}
+
+// Set up color picker + palette swatches in appraiser modal
+function _apColorInit(appraiserId, currentColor) {
+  const inp   = document.getElementById('ap-color');
+  const wrap  = document.getElementById('ap-color-swatches');
+  const reset = document.getElementById('ap-color-reset-btn');
+  if (!inp || !wrap) return;
+
+  // Default palette color for this appraiser slot (by position in array)
+  const paletteDefault = (() => {
+    if (!appraiserId) return AP_COLORS[appraisers.length % AP_COLORS.length];
+    const idx = appraisers.findIndex(a => a.id === appraiserId);
+    return AP_COLORS[(idx >= 0 ? idx : appraisers.length) % AP_COLORS.length];
+  })();
+  _apColorDefaultHex = paletteDefault;
+
+  // All swatches: palette colors + current custom color if different
+  const swatchColors = [...AP_COLORS];
+  if (currentColor && !swatchColors.includes(currentColor.toLowerCase())) {
+    swatchColors.push(currentColor);
+  }
+
+  // Set initial picker value
+  inp.value = currentColor || paletteDefault;
+  reset.style.display = currentColor && currentColor !== paletteDefault ? '' : 'none';
+
+  // Build swatch buttons
+  wrap.innerHTML = swatchColors.map(c =>
+    `<button type="button" onclick="_apColorSwatch('${c}')"
+      title="${c}"
+      style="width:22px;height:22px;border-radius:50%;background:${c};border:2px solid ${c === (currentColor||paletteDefault) ? '#fff' : 'transparent'};outline:2px solid ${c === (currentColor||paletteDefault) ? c : 'transparent'};cursor:pointer;padding:0;transition:all .15s"></button>`
+  ).join('');
+
+  // Live preview: update swatches highlight on picker change
+  inp.oninput = () => {
+    const v = inp.value;
+    wrap.querySelectorAll('button').forEach(b => {
+      const bc = b.getAttribute('onclick').match(/'([^']+)'/)[1];
+      b.style.border = `2px solid ${bc === v ? '#fff' : 'transparent'}`;
+      b.style.outline = `2px solid ${bc === v ? bc : 'transparent'}`;
+    });
+    reset.style.display = (v && v.toLowerCase() !== paletteDefault.toLowerCase()) ? '' : 'none';
+  };
+}
+
+function _apColorSwatch(hex) {
+  const inp = document.getElementById('ap-color');
+  if (!inp) return;
+  inp.value = hex;
+  inp.dispatchEvent(new Event('input'));
 }
 
 function apInitials(appraiserId) {
@@ -5715,8 +5816,12 @@ function renderAppraisers() {
     const fillCls = pct >= 100 ? 'over' : pct >= 75 ? 'warn' : '';
     const expBadge = licExpBadge(a.licexp);
     const hasImg  = !!licenseImages[a.id];
-    return `<div class="appraiser-card">
-      <div class="ap-name">${esc(a.name)}</div>
+    const apClr = apColor(a.id);
+    return `<div class="appraiser-card" style="border-top:3px solid ${apClr}">
+      <div class="ap-name" style="display:flex;align-items:center;gap:8px">
+        <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${apClr};flex-shrink:0"></span>
+        ${esc(a.name)}
+      </div>
       <div class="ap-info">
         ${a.phone   ? `<span>📞 ${esc(a.phone)}</span>` : ''}
         ${a.email   ? `<span>✉️ ${esc(a.email)}</span>` : ''}
@@ -5761,6 +5866,7 @@ function openAppraiserModal(id) {
     document.getElementById('ap-zip').value        = a.zip      || '';
     document.getElementById('ap-ssn').value        = a.ssn      || '';
     document.getElementById('ap-ssn').type         = 'password';
+    _apColorInit(a.id, a.color || '');
   } else {
     ['ap-name','ap-phone','ap-email','ap-license','ap-ascid','ap-notes','ap-address','ap-city','ap-zip','ap-ssn'].forEach(fid => { document.getElementById(fid).value=''; });
     document.getElementById('ap-capacity').value   = 10;
@@ -5770,6 +5876,7 @@ function openAppraiserModal(id) {
     document.getElementById('ap-split').value      = 100;
     document.getElementById('ap-addr-state').value = '';
     document.getElementById('ap-ssn').type         = 'password';
+    _apColorInit(null, '');
   }
   document.getElementById('ap-modal-overlay').classList.add('open');
 }
@@ -5799,6 +5906,7 @@ function saveAppraiser() {
     addrState:    document.getElementById('ap-addr-state').value,
     zip:          document.getElementById('ap-zip').value.trim(),
     ssn:          document.getElementById('ap-ssn').value.trim(),
+    color:        (document.getElementById('ap-color').value && document.getElementById('ap-color').value !== _apColorDefaultHex) ? document.getElementById('ap-color').value : null,
   };
   let savedAppraiser;
   if (editingAppraiserId) {
@@ -5850,7 +5958,7 @@ function deleteAppraiser(id) {
 // ══════════════════════════════════════════
 // PROFILE PANEL
 // ══════════════════════════════════════════
-function openProfile(type, id) {
+function openProfile(type, id, readonly) {
   profileTarget = { type, id };
   const overlay = document.getElementById('profile-overlay');
   const panel   = document.getElementById('profile-panel');
@@ -5860,6 +5968,10 @@ function openProfile(type, id) {
   const body    = document.getElementById('profile-panel-body');
   const editBtn = document.getElementById('profile-edit-btn');
   const delBtn  = document.getElementById('profile-delete-btn');
+  // Hide edit/delete for read-only callers (e.g. appraiser page company view)
+  const isReadonly = !!readonly || (!isAdmin && (type === 'amc' || type === 'lender'));
+  editBtn.style.display = isReadonly ? 'none' : '';
+  delBtn.style.display  = isReadonly ? 'none' : '';
 
   if (type === 'appraiser') {
     const a = appraisers.find(x => x.id === id);
@@ -6252,7 +6364,8 @@ function renderCompanies() {
       }
       licCell = `<td style="display:${isAmc?'':'none'}">
         ${c.amclic ? `<span style="font-family:'DM Mono',monospace;font-size:12px">${esc(c.amclic)}</span>` : '<span style="color:var(--muted);font-style:italic;font-size:12px">—</span>'}
-        ${badge ? `<br>${badge}` : ''}
+        ${exp ? `<br><span style="font-size:11px;color:var(--muted)">${fmt(c.amclicexp)}</span>` : ''}
+        ${badge ? `&ensp;${badge}` : ''}
       </td>`;
     }
 
@@ -6276,6 +6389,79 @@ function renderCompanies() {
           <button class="co-act-btn danger" onclick="deleteCompany('${c.id}')">Delete</button>
         </div>
       </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── APPRAISER PAGE TABS (Team / AMCs / Lenders) ──────────────────────────────
+let apPageTab = 'team'; // 'team' | 'amc' | 'lender'
+
+function setApPageTab(tab) {
+  apPageTab = tab;
+  ['team','amc','lender'].forEach(t => {
+    document.getElementById('ap-tab-' + t)?.classList.toggle('active', t === tab);
+  });
+  const isTeam = tab === 'team';
+  document.getElementById('ap-team-section').style.display = isTeam ? '' : 'none';
+  document.getElementById('ap-co-section').style.display   = isTeam ? 'none' : '';
+  if (!isTeam) {
+    document.getElementById('ap-co-search').value = '';
+    renderApCoList();
+  }
+}
+
+function renderApCoList() {
+  const q      = (document.getElementById('ap-co-search')?.value || '').toLowerCase();
+  const isAmc  = apPageTab === 'amc';
+  const db     = isAmc ? amcs : lenders;
+  const list   = db.filter(c => !q || c.name.toLowerCase().includes(q) || (c.contact||'').toLowerCase().includes(q));
+  const licTh  = document.getElementById('ap-co-th-lic');
+  if (licTh) licTh.style.display = isAmc ? '' : 'none';
+
+  const tbody  = document.getElementById('ap-co-tbody');
+  const colspan = isAmc ? 7 : 6;
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;padding:32px;color:var(--muted)">${q ? 'No matches' : 'No ' + (isAmc ? 'AMCs' : 'Lenders') + ' on file.'}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map(c => {
+    const orderCount = isAmc
+      ? orders.filter(o => o.amc === c.name).length
+      : orders.filter(o => o.lender === c.name).length;
+
+    let licCell = '';
+    if (isAmc) {
+      const today = new Date(); today.setHours(0,0,0,0);
+      const exp   = c.amclicexp ? new Date(c.amclicexp + 'T00:00:00') : null;
+      const days  = exp ? Math.round((exp - today) / 86400000) : null;
+      let badge = '';
+      if (exp) {
+        if (days < 0)        badge = `<span class="license-exp-over" style="font-size:11px">Expired</span>`;
+        else if (days <= 90) badge = `<span class="license-exp-warn" style="font-size:11px">${days}d left</span>`;
+        else                 badge = `<span class="license-exp-ok" style="font-size:11px">✓ Valid</span>`;
+      }
+      licCell = `<td>
+        ${c.amclic ? `<span style="font-family:'DM Mono',monospace;font-size:12px">${esc(c.amclic)}</span>` : '<span style="color:var(--muted);font-style:italic;font-size:12px">—</span>'}
+        ${exp ? `<br><span style="font-size:11px;color:var(--muted)">${fmt(c.amclicexp)}</span>` : ''}
+        ${badge ? `&ensp;${badge}` : ''}
+      </td>`;
+    }
+
+    const websiteUrl = c.website ? (c.website.startsWith('http') ? c.website : 'https://' + c.website) : '';
+    const websiteCell = websiteUrl
+      ? `<a href="${esc(websiteUrl)}" target="_blank" rel="noopener" style="color:var(--sage);text-decoration:none;font-size:12px">${esc(c.website.replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,''))}</a>`
+      : '—';
+
+    return `
+    <tr style="cursor:pointer" onclick="openProfile('${apPageTab}','${c.id}')">
+      <td><div class="co-name">${esc(c.name)}</div></td>
+      <td>${esc(c.contact)||'—'}</td>
+      <td><a href="tel:${esc(c.phone)}">${esc(c.phone)||'—'}</a></td>
+      <td><a href="mailto:${esc(c.email)}">${esc(c.email)||'—'}</a></td>
+      <td>${websiteCell}</td>
+      ${licCell}
+      <td style="font-variant-numeric:tabular-nums">${orderCount}</td>
     </tr>`;
   }).join('');
 }
