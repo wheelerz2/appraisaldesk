@@ -1841,7 +1841,7 @@ body.is-admin .admin-only { display: block !important; }
     <button class="nav-tab" onclick="showPage('map')">🗺 Map</button>
     <button class="nav-tab" onclick="showPage('calendar')">Calendar</button>
     <button class="nav-tab admin-only" onclick="showPage('appraisers')">Appraisers</button>
-    <button class="nav-tab admin-only" onclick="showPage('companies')">Companies</button>
+    <button class="nav-tab" onclick="showPage('companies')">Companies</button>
     <button class="nav-tab admin-only" onclick="showPage('income')">Income</button>
     <button class="nav-tab" onclick="showPage('accounting')">Accounting</button>
     <button class="nav-tab admin-only" onclick="showPage('settings')">⚙ Settings</button>
@@ -1972,32 +1972,7 @@ body.is-admin .admin-only { display: block !important; }
         <h2>Appraisers</h2>
         <button class="btn-add admin-only" onclick="openAppraiserModal(null)">+ Add Appraiser</button>
       </div>
-      <!-- Page-level tabs: Team / AMCs / Lenders -->
-      <div class="co-tabs" id="ap-page-tabs">
-        <button class="co-tab active" id="ap-tab-team"   onclick="setApPageTab('team')">Team</button>
-        <button class="co-tab"        id="ap-tab-amc"    onclick="setApPageTab('amc')">AMCs</button>
-        <button class="co-tab"        id="ap-tab-lender" onclick="setApPageTab('lender')">Lenders</button>
-      </div>
-      <!-- Team grid -->
-      <div id="ap-team-section">
-        <div class="appraiser-grid" id="appraiser-grid"></div>
-      </div>
-      <!-- Companies read-only view -->
-      <div id="ap-co-section" style="display:none">
-        <div class="co-toolbar">
-          <input class="co-search" type="search" placeholder="Search…" id="ap-co-search" oninput="renderApCoList()">
-        </div>
-        <div class="co-table-wrap">
-          <table class="co-table">
-            <thead>
-              <tr>
-                <th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Website</th><th id="ap-co-th-lic" style="display:none">AMC License</th><th>Orders</th>
-              </tr>
-            </thead>
-            <tbody id="ap-co-tbody"></tbody>
-          </table>
-        </div>
-      </div>
+      <div class="appraiser-grid" id="appraiser-grid"></div>
     </div>
   </div>
 
@@ -2006,7 +1981,7 @@ body.is-admin .admin-only { display: block !important; }
     <div class="main-content">
       <div class="page-header">
         <h2>Companies</h2>
-        <button class="btn-add" id="co-add-btn" onclick="openCompanyModal(null)">+ Add Company</button>
+        <button class="btn-add admin-only" id="co-add-btn" onclick="openCompanyModal(null)">+ Add Company</button>
       </div>
       <div class="co-tabs">
         <button class="co-tab active" id="co-tab-amc" onclick="setCoTab('amc')">AMCs</button>
@@ -2019,7 +1994,7 @@ body.is-admin .admin-only { display: block !important; }
         <table class="co-table">
           <thead>
             <tr>
-              <th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Website</th><th id="co-th-lic" style="display:none">AMC License</th><th>Orders</th><th></th>
+              <th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Website</th><th id="co-th-lic" style="display:none">AMC License</th><th>Orders</th><th class="admin-only"></th>
             </tr>
           </thead>
           <tbody id="co-tbody"></tbody>
@@ -4124,7 +4099,7 @@ function showPage(name) {
   if (name === 'orders') { buildSidebarFilters(); renderOrders(); }
   if (name === 'map') renderMapPage();
   if (name === 'calendar') renderCalendar();
-  if (name === 'appraisers') { populateAppraisersSelect(); renderAppraisers(); setApPageTab('team'); }
+  if (name === 'appraisers') { populateAppraisersSelect(); renderAppraisers(); }
   if (name === 'companies') renderCompanies();
   if (name === 'income') renderIncome();
   if (name === 'accounting') {
@@ -6371,97 +6346,24 @@ function renderCompanies() {
 
     const websiteUrl = c.website ? (c.website.startsWith('http') ? c.website : 'https://' + c.website) : '';
     const websiteCell = websiteUrl
-      ? `<a href="${esc(websiteUrl)}" target="_blank" rel="noopener" style="color:var(--sage);text-decoration:none;font-size:12px" title="${esc(c.website)}">${esc(c.website.replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,''))}</a>`
+      ? `<a href="${esc(websiteUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--sage);text-decoration:none;font-size:12px" title="${esc(c.website)}">${esc(c.website.replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,''))}</a>`
       : '—';
     return `
-    <tr>
+    <tr style="cursor:pointer" onclick="openProfile('${coTab}','${c.id}')">
       <td><div class="co-name">${esc(c.name)}</div></td>
       <td>${esc(c.contact)||'—'}</td>
-      <td><a href="tel:${esc(c.phone)}">${esc(c.phone)||'—'}</a></td>
-      <td><a href="mailto:${esc(c.email)}">${esc(c.email)||'—'}</a></td>
+      <td><a href="tel:${esc(c.phone)}" onclick="event.stopPropagation()">${esc(c.phone)||'—'}</a></td>
+      <td><a href="mailto:${esc(c.email)}" onclick="event.stopPropagation()">${esc(c.email)||'—'}</a></td>
       <td>${websiteCell}</td>
       ${licCell}
       <td style="font-variant-numeric:tabular-nums">${orderCount}</td>
-      <td>
+      <td class="admin-only" onclick="event.stopPropagation()">
         <div class="co-actions">
           <button class="co-act-btn" onclick="openProfile('${coTab}','${c.id}')">View</button>
           <button class="co-act-btn" onclick="openCompanyModal('${c.id}','${coTab}')">Edit</button>
           <button class="co-act-btn danger" onclick="deleteCompany('${c.id}')">Delete</button>
         </div>
       </td>
-    </tr>`;
-  }).join('');
-}
-
-// ── APPRAISER PAGE TABS (Team / AMCs / Lenders) ──────────────────────────────
-let apPageTab = 'team'; // 'team' | 'amc' | 'lender'
-
-function setApPageTab(tab) {
-  apPageTab = tab;
-  ['team','amc','lender'].forEach(t => {
-    document.getElementById('ap-tab-' + t)?.classList.toggle('active', t === tab);
-  });
-  const isTeam = tab === 'team';
-  document.getElementById('ap-team-section').style.display = isTeam ? '' : 'none';
-  document.getElementById('ap-co-section').style.display   = isTeam ? 'none' : '';
-  if (!isTeam) {
-    document.getElementById('ap-co-search').value = '';
-    renderApCoList();
-  }
-}
-
-function renderApCoList() {
-  const q      = (document.getElementById('ap-co-search')?.value || '').toLowerCase();
-  const isAmc  = apPageTab === 'amc';
-  const db     = isAmc ? amcs : lenders;
-  const list   = db.filter(c => !q || c.name.toLowerCase().includes(q) || (c.contact||'').toLowerCase().includes(q));
-  const licTh  = document.getElementById('ap-co-th-lic');
-  if (licTh) licTh.style.display = isAmc ? '' : 'none';
-
-  const tbody  = document.getElementById('ap-co-tbody');
-  const colspan = isAmc ? 7 : 6;
-  if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;padding:32px;color:var(--muted)">${q ? 'No matches' : 'No ' + (isAmc ? 'AMCs' : 'Lenders') + ' on file.'}</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = list.map(c => {
-    const orderCount = isAmc
-      ? orders.filter(o => o.amc === c.name).length
-      : orders.filter(o => o.lender === c.name).length;
-
-    let licCell = '';
-    if (isAmc) {
-      const today = new Date(); today.setHours(0,0,0,0);
-      const exp   = c.amclicexp ? new Date(c.amclicexp + 'T00:00:00') : null;
-      const days  = exp ? Math.round((exp - today) / 86400000) : null;
-      let badge = '';
-      if (exp) {
-        if (days < 0)        badge = `<span class="license-exp-over" style="font-size:11px">Expired</span>`;
-        else if (days <= 90) badge = `<span class="license-exp-warn" style="font-size:11px">${days}d left</span>`;
-        else                 badge = `<span class="license-exp-ok" style="font-size:11px">✓ Valid</span>`;
-      }
-      licCell = `<td>
-        ${c.amclic ? `<span style="font-family:'DM Mono',monospace;font-size:12px">${esc(c.amclic)}</span>` : '<span style="color:var(--muted);font-style:italic;font-size:12px">—</span>'}
-        ${exp ? `<br><span style="font-size:11px;color:var(--muted)">${fmt(c.amclicexp)}</span>` : ''}
-        ${badge ? `&ensp;${badge}` : ''}
-      </td>`;
-    }
-
-    const websiteUrl = c.website ? (c.website.startsWith('http') ? c.website : 'https://' + c.website) : '';
-    const websiteCell = websiteUrl
-      ? `<a href="${esc(websiteUrl)}" target="_blank" rel="noopener" style="color:var(--sage);text-decoration:none;font-size:12px">${esc(c.website.replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,''))}</a>`
-      : '—';
-
-    return `
-    <tr style="cursor:pointer" onclick="openProfile('${apPageTab}','${c.id}')">
-      <td><div class="co-name">${esc(c.name)}</div></td>
-      <td>${esc(c.contact)||'—'}</td>
-      <td><a href="tel:${esc(c.phone)}">${esc(c.phone)||'—'}</a></td>
-      <td><a href="mailto:${esc(c.email)}">${esc(c.email)||'—'}</a></td>
-      <td>${websiteCell}</td>
-      ${licCell}
-      <td style="font-variant-numeric:tabular-nums">${orderCount}</td>
     </tr>`;
   }).join('');
 }
@@ -11735,9 +11637,11 @@ function printInvoice(orderId) {
     }
 
     if (id === 'parties') {
+      const lenderVal = [o.lender, o.loanNum ? 'Loan #' + o.loanNum : ''].filter(Boolean).join('  ·  ');
+      const amcVal    = [o.amc,    o.amcOrderId ? 'Order #' + o.amcOrderId : ''].filter(Boolean).join('  ·  ');
       const content = `<table>${
-        row('Lender', o.lender||'') +
-        row('AMC', o.amc||'')
+        row('Lender', lenderVal) +
+        row('AMC', amcVal)
       }</table>`;
       sectionsHtml += sectionBlock(title, content);
       return;
