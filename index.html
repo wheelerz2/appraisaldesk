@@ -1994,7 +1994,7 @@ body.is-admin .admin-only { display: block !important; }
         <table class="co-table">
           <thead>
             <tr>
-              <th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Website</th><th id="co-th-lic" style="display:none">AMC License</th><th>Orders</th><th class="admin-only"></th>
+              <th>Name</th><th>Address</th><th>Website</th><th id="co-th-lic" style="display:none">AMC License</th><th>Orders</th><th class="admin-only"></th>
             </tr>
           </thead>
           <tbody id="co-tbody"></tbody>
@@ -6111,6 +6111,7 @@ function buildCompanyProfileBody(c, type) {
     <div class="profile-section">
       <div class="profile-section-title">Contact Information</div>
       <div class="profile-kv">
+        ${(c.address||c.city) ? `<div class="profile-kv-row"><span class="profile-kv-label">Address</span>${esc([c.address,[c.city,c.state,c.zip].filter(Boolean).join(' ')].filter(Boolean).join(', '))}</div>` : ''}
         ${c.contact ? `<div class="profile-kv-row"><span class="profile-kv-label">Contact</span>${esc(c.contact)}</div>` : ''}
         ${c.phone   ? `<div class="profile-kv-row"><span class="profile-kv-label">Phone</span><a href="tel:${esc(c.phone)}">${esc(c.phone)}</a></div>` : ''}
         ${c.email   ? `<div class="profile-kv-row"><span class="profile-kv-label">Email</span><a href="mailto:${esc(c.email)}">${esc(c.email)}</a></div>` : ''}
@@ -6351,9 +6352,7 @@ function renderCompanies() {
     return `
     <tr style="cursor:pointer" onclick="openProfile('${coTab}','${c.id}')">
       <td><div class="co-name">${esc(c.name)}</div></td>
-      <td>${esc(c.contact)||'—'}</td>
-      <td><a href="tel:${esc(c.phone)}" onclick="event.stopPropagation()">${esc(c.phone)||'—'}</a></td>
-      <td><a href="mailto:${esc(c.email)}" onclick="event.stopPropagation()">${esc(c.email)||'—'}</a></td>
+      <td style="font-size:12px;color:var(--muted)">${[c.address, [c.city, c.state, c.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')||'—'}</td>
       <td>${websiteCell}</td>
       ${licCell}
       <td style="font-variant-numeric:tabular-nums">${orderCount}</td>
