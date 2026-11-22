@@ -3862,6 +3862,7 @@ function renderDashboard() {
         <div class="dash-row-meta">
           ${timeStr ? `<span class="dash-row-time">${esc(timeStr)}</span>` : ''}
           <span class="dash-row-pill" style="background:color-mix(in srgb,${sc} 15%,transparent);color:${sc}">${esc(pill)}</span>
+          ${o.type ? `<span class="dash-row-pill" style="background:color-mix(in srgb,var(--steel) 12%,transparent);color:var(--steel)">${esc(o.type)}</span>` : ''}
           <span class="dash-row-ap"><span class="dash-row-dot" style="background:${color}"></span>${esc(ap)}</span>
           ${client ? `<span>· ${esc(client)}</span>` : ''}
         </div>
@@ -3881,6 +3882,7 @@ function renderDashboard() {
         <div class="dash-row-addr" title="${esc(addr)}">${esc(addr)}</div>
         <div class="dash-row-meta">
           <span class="dash-row-pill" style="background:color-mix(in srgb,${sc} 15%,transparent);color:${sc}">${esc(pill)}</span>
+          ${o.type ? `<span class="dash-row-pill" style="background:color-mix(in srgb,var(--steel) 12%,transparent);color:var(--steel)">${esc(o.type)}</span>` : ''}
           ${o.due ? `<span>Due ${esc(o.due)}</span>` : ''}
           ${client ? `<span>· ${esc(client)}</span>` : ''}
         </div>
@@ -3927,7 +3929,7 @@ function renderDashboard() {
         return `<div class="dash-tmr-row" onclick="openDetail('${esc(o.id)}')">
           <div class="dash-tmr-bar" style="background:${color}"></div>
           <div class="dash-tmr-time">${esc(time)}</div>
-          <div class="dash-tmr-addr" title="${esc(addr)}">${esc(addr)}</div>
+          <div class="dash-tmr-addr" title="${esc(addr)}">${esc(addr)}${o.type ? ` <span style="font-size:10px;font-weight:700;opacity:.7">${esc(o.type)}</span>` : ''}</div>
           <div class="dash-tmr-ap"><span class="dash-row-dot" style="background:${color};display:inline-block;margin-right:4px"></span>${esc(ap)}</div>
         </div>`;
       }).join('');
@@ -3947,6 +3949,7 @@ function renderDashboard() {
         <div class="dash-row-addr" title="${esc(addr)}">${esc(addr)}</div>
         <div class="dash-row-meta">
           <span class="dash-row-pill" style="background:color-mix(in srgb,${sc} 15%,transparent);color:${sc}">${esc(pill)}</span>
+          ${o.type ? `<span class="dash-row-pill" style="background:color-mix(in srgb,var(--steel) 12%,transparent);color:var(--steel)">${esc(o.type)}</span>` : ''}
           ${dueLbl}
           <span class="dash-row-ap"><span class="dash-row-dot" style="background:${color}"></span>${esc(ap)}</span>
           ${client ? `<span>· ${esc(client)}</span>` : ''}
@@ -3974,6 +3977,7 @@ function renderDashboard() {
       <div class="dash-row-inner">
         <div class="dash-row-addr" title="${esc(addr)}">${esc(addr)}</div>
         <div class="dash-row-meta">
+          ${o.type ? `<span class="dash-row-pill" style="background:color-mix(in srgb,var(--steel) 12%,transparent);color:var(--steel)">${esc(o.type)}</span>` : ''}
           <span class="dash-row-ap"><span class="dash-row-dot" style="background:${color}"></span>${esc(ap)}</span>
           ${o.due ? `<span>· Due ${esc(o.due)}</span>` : ''}
           ${client ? `<span>· ${esc(client)}</span>` : ''}
@@ -4005,6 +4009,14 @@ function renderDashboard() {
         </div>
         <div class="dash-panel">
           <div class="dash-panel-head">
+            <span class="dash-panel-icon">📅</span>
+            <span class="dash-panel-title">Tomorrow — ${tomorrow.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}</span>
+            <span class="dash-panel-count${tomorrowInsp.length===0?' zero':''}">${tomorrowInsp.length}</span>
+          </div>
+          <div class="dash-panel-body">${tmrRows}</div>
+        </div>
+        <div class="dash-panel">
+          <div class="dash-panel-head">
             <span class="dash-panel-icon">✍️</span>
             <span class="dash-panel-title">Ready to Write</span>
             <span class="dash-panel-count${readyToWrite.length===0?' zero':''}">${readyToWrite.length}</span>
@@ -4029,42 +4041,32 @@ function renderDashboard() {
         <div class="dash-panel-body no-max">${unschRows}</div>
       </div>
     </div>
-    <div id="dash-bottom">
-      <div id="dash-tmr">
+    <div id="dash-right-col" style="display:flex;flex-direction:column;gap:14px;margin-top:14px">
+      <div class="dash-panel">
         <div class="dash-panel-head">
-          <span class="dash-panel-icon">📅</span>
-          <span class="dash-panel-title">Tomorrow — ${tomorrow.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}</span>
-          <span class="dash-panel-count${tomorrowInsp.length===0?' zero':''}">${tomorrowInsp.length}</span>
+          <span class="dash-panel-icon">📆</span>
+          <span class="dash-panel-title">Due Today</span>
+          <span class="dash-panel-count${dueToday.length===0?' zero':''}">${dueToday.length}</span>
         </div>
-        ${tmrRows}
+        <div class="dash-panel-body">${dueTodayRows}</div>
       </div>
-      <div id="dash-right-col">
-        <div class="dash-panel">
-          <div class="dash-panel-head">
-            <span class="dash-panel-icon">📆</span>
-            <span class="dash-panel-title">Due Today</span>
-            <span class="dash-panel-count${dueToday.length===0?' zero':''}">${dueToday.length}</span>
-          </div>
-          <div class="dash-panel-body">${dueTodayRows}</div>
+      <div class="dash-panel">
+        <div class="dash-panel-head">
+          <span class="dash-panel-icon">⚠️</span>
+          <span class="dash-panel-title">Overdue</span>
+          <span class="dash-panel-count${overdue.length===0?' zero':''}" style="${overdue.length>0?'background:#dc2626':''}">${overdue.length}</span>
         </div>
-        <div class="dash-panel">
-          <div class="dash-panel-head">
-            <span class="dash-panel-icon">⚠️</span>
-            <span class="dash-panel-title">Overdue</span>
-            <span class="dash-panel-count${overdue.length===0?' zero':''}" style="${overdue.length>0?'background:#dc2626':''}">${overdue.length}</span>
-          </div>
-          <div class="dash-panel-body">${overdueRows}</div>
-        </div>
-        ${waitingQstn.length > 0 ? `
-        <div class="dash-panel">
-          <div class="dash-panel-head">
-            <span class="dash-panel-icon">📝</span>
-            <span class="dash-panel-title">Waiting for Questionnaire</span>
-            <span class="dash-panel-count" style="background:var(--s-questionnaire)">${waitingQstn.length}</span>
-          </div>
-          <div class="dash-panel-body">${qstnRows}</div>
-        </div>` : ''}
+        <div class="dash-panel-body">${overdueRows}</div>
       </div>
+      ${waitingQstn.length > 0 ? `
+      <div class="dash-panel">
+        <div class="dash-panel-head">
+          <span class="dash-panel-icon">📝</span>
+          <span class="dash-panel-title">Waiting for Questionnaire</span>
+          <span class="dash-panel-count" style="background:var(--s-questionnaire)">${waitingQstn.length}</span>
+        </div>
+        <div class="dash-panel-body">${qstnRows}</div>
+      </div>` : ''}
     </div>
   `;
 }
