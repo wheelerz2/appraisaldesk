@@ -7552,24 +7552,43 @@ function extractOrderData(raw) {
     // AMC
     trySet('f-amc', 'Nationwide Property & Appraisal');
 
-    // Lender — "Client displayed on report:" then lender name on next line
-    // Name may be followed by "Loan Type:" noise — strip everything from "Loan Type:" onward
-    const npaClientM = text.match(/Client\s+displayed\s+on\s+report\s*:[\s\S]*?\n\s*([A-Za-z][^\n]{3,60})/i);
-    const npaLenderRaw = npaClientM ? npaClientM[1].trim() : '';
-    const npaLenderName = npaLenderRaw
-      .replace(/\s*(Loan\s+Type|JobType|Intended|AMC\s+Lic|Client\s+Fee|\$|Process\s+Type|FHA)[^\n]*/i, '')
-      .replace(/\s+LLC\s+\w.*$/, ' LLC')   // "Arc Home Loan LLC Loan Type:..." → stop after LLC
-      .replace(/\s+Inc\.?\s+\w.*$/, ' Inc') // same for Inc
-      .replace(/\s+Corp\.?\s+\w.*$/, ' Corp')
-      .trim();
+    // Lender — "Client displayed on report:" then lender name follows (may be several lines later)
+    // Scan forward from that label; skip blank lines and lines that look like continuations
+    // of the AMC company block (e.g. "Appraisal Services") — those don't have numbers or LLC/Inc
+    const npaClientLabelIdx = text.search(/Client\s+displayed\s+on\s+report\s*:/i);
+    let npaLenderName = '';
+    if (npaClientLabelIdx >= 0) {
+      const afterLabel = text.slice(npaClientLabelIdx);
+      // Skip the label line itself, then find first line that looks like a lender name
+      const labelLineEnd = afterLabel.indexOf('\n');
+      const afterLabelLines = afterLabel.slice(labelLineEnd + 1).split('\n');
+      for (const rawLine of afterLabelLines) {
+        const line = rawLine.trim();
+        if (!line) continue;
+        // Stop if we've hit a property/order section
+        if (/^(JobType|Loan\s+Type|Address\s*1|City:|Zip|Property|Borrower|Due\s+Date)/i.test(line)) break;
+        // Skip lines that look like AMC info (email, phone, URL) or pure continuation words
+        if (/@|www\.|http|\.com|^\+?\d|^(Phone|Email|Fax|Cell)\s*:/i.test(line)) continue;
+        // Skip short fragments that are likely AMC name continuations (< 4 words, no LLC/Bank/Mortgage)
+        const wordCount = line.split(/\s+/).length;
+        if (wordCount <= 2 && !/LLC|Inc\.|Corp|Bank|Mortgage|Loan|Credit|Trust|Home/i.test(line)) continue;
+        // This line is the lender name
+        npaLenderName = line
+          .replace(/\s*(Loan\s+Type|JobType|Intended|AMC\s+Lic|Client\s+Fee|\$|Process\s+Type|FHA)[^\n]*/i, '')
+          .replace(/\s+LLC\s+\w.*$/, ' LLC')
+          .replace(/\s+Inc\.?\s+\w.*$/, ' Inc')
+          .replace(/\s+Corp\.?\s+\w.*$/, ' Corp')
+          .trim();
+        break;
+      }
+    }
     if (npaLenderName) trySet('f-lender', npaLenderName);
 
     // Lender address — lines immediately after the lender name, before JobType/Loan Type
     // The PDF has: LenderName\n224 West Strawbridge Drive,\nSuite 200\nMoorestown, NJ 08057\nJobType:
     if (npaLenderName) {
-      // Find the block after "Client displayed on report:" label
-      const clientBlockM = text.match(/Client\s+displayed\s+on\s+report\s*:[\s\S]{0,20}?\n/i);
-      const searchStart  = clientBlockM ? text.indexOf(clientBlockM[0]) + clientBlockM[0].length : 0;
+      // Search for lender name starting from the "Client displayed on report:" label position
+      const searchStart  = npaClientLabelIdx >= 0 ? npaClientLabelIdx : 0;
       const lenderIdx    = text.indexOf(npaLenderName, searchStart);
       const afterLender  = lenderIdx >= 0 ? text.slice(lenderIdx + npaLenderName.length) : '';
       const addrLines    = [];
