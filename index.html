@@ -2643,7 +2643,7 @@ body.is-admin .admin-only { display: block !important; }
         <div class="field">
           <label>Lender</label>
           <div class="ac-wrap">
-            <input type="text" id="f-lender" autocomplete="off" placeholder="Type to search or add…" oninput="acInput('lender')" onfocus="acInput('lender')" onblur="acBlur('lender')">
+            <input type="text" id="f-lender" autocomplete="off" placeholder="Type to search or add…" oninput="acInput('lender')" onfocus="acInput('lender')" onblur="acBlur('lender');fillLenderAddressFields(this.value)">
             <div class="ac-list" id="ac-lender"></div>
           </div>
         </div>
@@ -2784,7 +2784,7 @@ body.is-admin .admin-only { display: block !important; }
       <div class="form-row triple">
         <div class="field">
           <label>Inspection Date</label>
-          <input type="date" id="f-inspection" oninput="updateIcalBtn()">
+          <input type="date" id="f-inspection" oninput="updateIcalBtn();autoAdvanceInspStatus()">
         </div>
         <div class="field">
           <label>Inspection Time</label>
@@ -4634,7 +4634,7 @@ function showInspectionPopup(orderId, onSave) {
     o.inspection     = d;
     o.inspectionTime = t || '';
     // Auto-advance status when inspection is set
-    if (o.status === 'new') o.status = 'inspection';
+    if (['new','questionnaire','review','contract'].includes(o.status)) o.status = 'inspection';
     close();
     if (onSave) onSave();
   };
@@ -5261,36 +5261,29 @@ function acBlur(type) {
   }, 200);
 }
 
+function fillLenderAddressFields(name) {
+  if (!name) return;
+  const rec = lenders.find(c => c.name.toLowerCase() === name.toLowerCase());
+  if (!rec) return;
+  const streetEl = document.getElementById('f-lender-street');
+  const cityEl   = document.getElementById('f-lender-city');
+  const stateEl  = document.getElementById('f-lender-state');
+  const zipEl    = document.getElementById('f-lender-zip');
+  const phoneEl  = document.getElementById('f-lender-phone');
+  if (rec.address !== undefined || rec.city || rec.state || rec.zip) {
+    if (streetEl && (rec.address !== undefined)) streetEl.value = rec.address || '';
+    if (cityEl)   cityEl.value   = rec.city  || '';
+    if (stateEl)  stateEl.value  = rec.state || '';
+    if (zipEl)    zipEl.value    = rec.zip   || '';
+  }
+  if (phoneEl && rec.phone && !phoneEl.value) phoneEl.value = rec.phone;
+}
 function acSelect(type, name) {
   document.getElementById('f-' + type).value = name;
   document.getElementById('ac-' + type).classList.remove('open');
   // Auto-fill lender address and phone from stored lender record
   if (type === 'lender') {
-    const rec = lenders.find(c => c.name === name);
-    if (rec) {
-      const phoneEl  = document.getElementById('f-lender-phone');
-      const streetEl = document.getElementById('f-lender-street');
-      const cityEl   = document.getElementById('f-lender-city');
-      const stateEl  = document.getElementById('f-lender-state');
-      const zipEl    = document.getElementById('f-lender-zip');
-      // Fill separate address fields from stored lender record
-      if (rec.address || rec.city || rec.state || rec.zip) {
-        if (streetEl) streetEl.value = rec.address || '';
-        if (cityEl)   cityEl.value   = rec.city    || '';
-        if (stateEl)  stateEl.value  = rec.state   || '';
-        if (zipEl)    zipEl.value    = rec.zip      || '';
-      } else if (rec.address) {
-        // Old record with combined address string — parse it
-        const m = rec.address.match(/^(.*?),\s*([^,]+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
-        if (m) {
-          if (streetEl) streetEl.value = m[1].trim();
-          if (cityEl)   cityEl.value   = m[2].trim();
-          if (stateEl)  stateEl.value  = m[3].trim();
-          if (zipEl)    zipEl.value    = m[4].trim();
-        } else if (streetEl) { streetEl.value = rec.address; }
-      }
-      if (phoneEl && rec.phone && !phoneEl.value) phoneEl.value = rec.phone;
-    }
+    fillLenderAddressFields(name);
   }
 }
 
@@ -5672,7 +5665,7 @@ function renderCalendar() {
     const evs = evMap[dateStr] || [];
     // Filter due events by toggle
     const visibleEvs = calShowDue ? evs : evs.filter(e => e.type !== 'due');
-    const max = 8;
+    const max = 15;
     const shown = visibleEvs.slice(0, max);
     const more  = visibleEvs.length - max;
 
@@ -7559,29 +7552,46 @@ function extractOrderData(raw) {
     // AMC
     trySet('f-amc', 'Nationwide Property & Appraisal');
 
-    // Lender — "Client displayed on report:\n<Name>\n<Address>"
-    const npaClientM = text.match(/Client\s+displayed\s+on\s+report\s*:\s*\n?\s*([^\n]{5,60})/i);
-    if (npaClientM) trySet('f-lender', npaClientM[1].trim());
+    // Lender — "Client displayed on report:" then lender name on next line
+    // Name may be followed by "Loan Type:" noise — strip everything from "Loan Type:" onward
+    const npaClientM = text.match(/Client\s+displayed\s+on\s+report\s*:[\s\S]*?\n\s*([A-Za-z][^\n]{3,60})/i);
+    const npaLenderRaw = npaClientM ? npaClientM[1].trim() : '';
+    const npaLenderName = npaLenderRaw
+      .replace(/\s*(Loan\s+Type|JobType|Intended|AMC\s+Lic|Client\s+Fee|\$)[^\n]*/i, '')
+      .trim();
+    if (npaLenderName) trySet('f-lender', npaLenderName);
 
-    // Lender address — lines after the lender name, before the next label
-    if (npaClientM) {
-      const afterClient = text.slice(text.indexOf(npaClientM[0]) + npaClientM[0].length);
+    // Lender address — lines immediately after lender name line, up to JobType/Loan Type
+    if (npaLenderName) {
+      const nameIdx = text.indexOf(npaLenderName);
+      const afterName = text.slice(nameIdx + npaLenderName.length);
       const addrLines = [];
-      for (const line of afterClient.split('\n').map(l => l.trim()).filter(Boolean)) {
-        if (/^[A-Z][a-z]/.test(line) && /\d/.test(line)) { addrLines.push(line); continue; }
-        if (addrLines.length && /\d{5}/.test(line)) { addrLines.push(line); break; }
-        if (addrLines.length) break;
-        if (/Loan\s+Type|Intended|AMC|Due\s+Date|JobType/i.test(line)) break;
+      for (const line of afterName.split('\n').map(l => l.trim()).filter(Boolean)) {
+        if (/^(JobType|Loan\s+Type|Intended|AMC|Due\s+Date|Client\s+Fee|Process|FHA|\$\d)/i.test(line)) break;
+        if (/\d/.test(line) || /Suite|Floor|Blvd|Ave|Dr|Rd|St|Ln/i.test(line)) {
+          addrLines.push(line);
+        } else if (addrLines.length && /\d{5}/.test(line)) {
+          addrLines.push(line); break;
+        } else if (addrLines.length) break;
       }
       if (addrLines.length) {
-        trySet('f-lender-street', addrLines[0]);
-        if (addrLines[1]) {
-          const csz = addrLines[1].match(/^([^,]+),?\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+        // Combine "224 West Strawbridge Drive," + "Suite 200" into street
+        let street = addrLines[0].replace(/,\s*$/, '');
+        let cityLine = '';
+        if (addrLines[1] && !/\d{5}/.test(addrLines[1]) && /Suite|Floor|Ste/i.test(addrLines[1])) {
+          street += ', ' + addrLines[1];
+          cityLine = addrLines[2] || '';
+        } else {
+          cityLine = addrLines[1] || '';
+        }
+        trySet('f-lender-street', street);
+        if (cityLine) {
+          const csz = cityLine.match(/^([^,]+),?\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
           if (csz) {
             trySet('f-lender-city',  csz[1].trim());
             trySet('f-lender-state', csz[2].trim());
             trySet('f-lender-zip',   csz[3].trim());
-          } else { trySet('f-lender-city', addrLines[1]); }
+          }
         }
       }
     }
@@ -7595,30 +7605,33 @@ function extractOrderData(raw) {
                    || text.match(/\b(AMC-\d[\w\-]+)\b/i);
     if (npaAmcIdM) trySet('f-amcid', npaAmcIdM[1].trim());
 
-    // Property address — handles two-column NPA layout:
-    // "Address 1: 137-64 Westgate Street    Address2: N/A"
-    // "City: Springfield Gardens            State: NY"
-    // "Zip Code: 11413"
+    // Property address — NPA layout (pdftotext gives separate lines):
+    // "Address 1: 137-64 Westgate Street"
+    // "City: Springfield Gardens"
+    // "Zip Code: 11413"  then later "State:\nNY"
+    // Browser PDF.js may merge two columns: "Address 1: 137-64 Westgate St  Address2: N/A"
+    // Strategy: find "Address 1:" then grab only the street number+name, stop before any label
     const npaZipM   = text.match(/Zip\s+Code\s*:\s*(\d{5})/i);
-    const npaStateM = text.match(/State\s*:\s*([A-Z]{2})(?![A-Za-z])/i);
-    // City: strip anything after whitespace+State: or whitespace+Zip
+    // State: appears as inline "State: NY" or as label+next-line "State:\nNY"
+    const npaStateInline = text.match(/State\s*:\s*([A-Z]{2})(?!\w)/i);
+    const npaStateNext   = text.match(/State\s*:\s*\n\s*([A-Z]{2})(?!\w)/i);
+    const npaState = (npaStateInline || npaStateNext)?.[1] || 'NY';
+    // City: grab text after "City:" and stop at first label-like word or State/Zip
     const npaCityRaw = text.match(/City\s*:\s*([A-Za-z][^\n\r]{2,40})/i);
-    const npaCity = npaCityRaw ? npaCityRaw[1].replace(/\s+(State:|Zip|County:|\d{5}).*$/i,'').trim() : '';
-    // Address 1: strip trailing "Address2:..." noise
-    const npaAddr1Raw = text.match(/Address\s*1\s*:\s*([^\n\r]{5,80})/i);
-    const npaAddr1 = npaAddr1Raw ? npaAddr1Raw[1].replace(/\s+Address2?.*$/i,'').trim() : '';
-    // Also try the prominent address block before "Property Types:"
-    const npaAddrBlockM = text.match(/(\d[\w\-]+ [A-Za-z][^\n]{3,50})\n([A-Za-z][^\n]{2,40})\nZip Code:/i);
-    if (npaAddrBlockM) {
-      const street = npaAddrBlockM[1].trim();
-      const city   = npaAddrBlockM[2].trim();
-      const state  = npaStateM ? npaStateM[1] : 'NY';
-      const zip    = npaZipM   ? npaZipM[1]   : '';
-      setAddressFields(`${street}, ${city} ${state} ${zip}`.trim());
-    } else if (npaAddr1 && npaCity) {
-      const state  = npaStateM ? npaStateM[1] : 'NY';
-      const zip    = npaZipM   ? npaZipM[1]   : '';
-      setAddressFields(`${npaAddr1}, ${npaCity} ${state} ${zip}`.trim());
+    const npaCity = npaCityRaw
+      ? npaCityRaw[1].replace(/\s+(State\s*:|Zip|County\s*:|Address2\s*:|\d{5}).*$/i, '').trim()
+      : '';
+    // Address 1: grab only up to first run of 2+ spaces or a label keyword
+    const npaAddr1Raw = text.match(/Address\s*1\s*:\s*(\d[^\n\r]{4,70})/i);
+    const npaAddr1 = npaAddr1Raw
+      ? npaAddr1Raw[1]
+          .replace(/\s{2,}.*$/, '')          // stop at double-space (two-column merge)
+          .replace(/\s*(Address2?|City|State|Zip)\s*:.*$/i, '') // stop at any label
+          .trim()
+      : '';
+    if (npaAddr1 && npaCity) {
+      const zip = npaZipM ? npaZipM[1] : '';
+      setAddressFields(`${npaAddr1}, ${npaCity} ${npaState} ${zip}`.trim());
     }
 
     // Form type — "JobType: 1004/1007 - (URAR) with Rent Schedule" or "Product Type: Appraisal URAR"
@@ -7663,12 +7676,17 @@ function extractOrderData(raw) {
     const npaPhone  = npaCellM || npaPhoneM;
     if (npaPhone && !/N\/A/i.test(npaPhone[1])) trySet('f-phone', npaPhone[1].trim());
 
-    // Email — borrower email (skip AMC email)
-    const npaEmails = [...text.matchAll(/\b([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\b/g)];
-    for (const em of npaEmails) {
-      const addr = em[1].toLowerCase();
-      if (!addr.includes('nationwideamc') && !addr.includes('rhappraisal') && addr !== 'na@na.com') {
-        trySet('f-email', em[1]); break;
+    // Email — borrower email: appears after "Email:" label; skip AMC, realtor emails
+    const npaEmailLabelM = text.match(/\bEmail\s*:\s*\n?\s*([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/i);
+    if (npaEmailLabelM) {
+      trySet('f-email', npaEmailLabelM[1]);
+    } else {
+      const npaEmails = [...text.matchAll(/\b([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\b/g)];
+      for (const em of npaEmails) {
+        const addr = em[1].toLowerCase();
+        if (!addr.includes('nationwideamc') && !addr.includes('rhappraisal') && !addr.includes('ksrealty') && addr !== 'na@na.com') {
+          trySet('f-email', em[1]); break;
+        }
       }
     }
 
@@ -8622,6 +8640,16 @@ function verifyAddress() {
 // ══════════════════════════════════════════
 // FEE SPLIT HINT
 // ══════════════════════════════════════════
+function autoAdvanceInspStatus() {
+  const dateVal = document.getElementById('f-insp-popup-date') ? '' : (document.getElementById('f-inspection')?.value || '');
+  if (!dateVal) return;
+  const stEl = document.getElementById('f-status');
+  if (!stEl) return;
+  const preInsp = ['new','questionnaire','review','contract'];
+  if (preInsp.includes(stEl.value)) {
+    stEl.value = 'inspection';
+  }
+}
 function updateIcalBtn() {
   const btn  = document.getElementById('f-ical-btn');
   if (!btn) return;
