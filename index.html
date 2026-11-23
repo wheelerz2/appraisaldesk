@@ -7557,36 +7557,43 @@ function extractOrderData(raw) {
     const npaClientM = text.match(/Client\s+displayed\s+on\s+report\s*:[\s\S]*?\n\s*([A-Za-z][^\n]{3,60})/i);
     const npaLenderRaw = npaClientM ? npaClientM[1].trim() : '';
     const npaLenderName = npaLenderRaw
-      .replace(/\s*(Loan\s+Type|JobType|Intended|AMC\s+Lic|Client\s+Fee|\$)[^\n]*/i, '')
+      .replace(/\s*(Loan\s+Type|JobType|Intended|AMC\s+Lic|Client\s+Fee|\$|Process\s+Type|FHA)[^\n]*/i, '')
+      .replace(/\s+LLC\s+\w.*$/, ' LLC')   // "Arc Home Loan LLC Loan Type:..." → stop after LLC
+      .replace(/\s+Inc\.?\s+\w.*$/, ' Inc') // same for Inc
+      .replace(/\s+Corp\.?\s+\w.*$/, ' Corp')
       .trim();
     if (npaLenderName) trySet('f-lender', npaLenderName);
 
-    // Lender address — lines immediately after lender name line, up to JobType/Loan Type
+    // Lender address — lines immediately after the lender name, before JobType/Loan Type
+    // The PDF has: LenderName\n224 West Strawbridge Drive,\nSuite 200\nMoorestown, NJ 08057\nJobType:
     if (npaLenderName) {
-      const nameIdx = text.indexOf(npaLenderName);
-      const afterName = text.slice(nameIdx + npaLenderName.length);
-      const addrLines = [];
-      for (const line of afterName.split('\n').map(l => l.trim()).filter(Boolean)) {
-        if (/^(JobType|Loan\s+Type|Intended|AMC|Due\s+Date|Client\s+Fee|Process|FHA|\$\d)/i.test(line)) break;
-        if (/\d/.test(line) || /Suite|Floor|Blvd|Ave|Dr|Rd|St|Ln/i.test(line)) {
+      // Find the block after "Client displayed on report:" label
+      const clientBlockM = text.match(/Client\s+displayed\s+on\s+report\s*:[\s\S]{0,20}?\n/i);
+      const searchStart  = clientBlockM ? text.indexOf(clientBlockM[0]) + clientBlockM[0].length : 0;
+      const lenderIdx    = text.indexOf(npaLenderName, searchStart);
+      const afterLender  = lenderIdx >= 0 ? text.slice(lenderIdx + npaLenderName.length) : '';
+      const addrLines    = [];
+      for (const line of afterLender.split('\n').map(l => l.trim()).filter(Boolean)) {
+        if (/^(JobType|Loan\s+Type|Intended\s+Use|AMC\s+Lic|Client\s+Fee|Process|FHA|\$\d|Due\s+Date)/i.test(line)) break;
+        // Accept street lines (digit), suite lines, or city/state/zip line
+        if (/^\d/.test(line) || /\b(Suite|Ste|Floor|Fl)\b/i.test(line) || /\b[A-Z]{2}\s+\d{5}/.test(line)) {
           addrLines.push(line);
-        } else if (addrLines.length && /\d{5}/.test(line)) {
+          if (/\d{5}/.test(line)) break; // city/state/zip line — done
+        } else if (/^[A-Za-z][^:]{3,40},\s*[A-Z]{2}\s+\d{5}/.test(line)) {
           addrLines.push(line); break;
-        } else if (addrLines.length) break;
+        } else if (addrLines.length > 0) {
+          break; // non-matching line after we already have something — stop
+        }
       }
       if (addrLines.length) {
-        // Combine "224 West Strawbridge Drive," + "Suite 200" into street
-        let street = addrLines[0].replace(/,\s*$/, '');
-        let cityLine = '';
-        if (addrLines[1] && !/\d{5}/.test(addrLines[1]) && /Suite|Floor|Ste/i.test(addrLines[1])) {
-          street += ', ' + addrLines[1];
-          cityLine = addrLines[2] || '';
-        } else {
-          cityLine = addrLines[1] || '';
-        }
-        trySet('f-lender-street', street);
-        if (cityLine) {
-          const csz = cityLine.match(/^([^,]+),?\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+        // Last line with a zip is the city/state/zip line
+        const cszIdx  = addrLines.findLastIndex(l => /\d{5}/.test(l));
+        const cszLine = cszIdx >= 0 ? addrLines[cszIdx] : '';
+        const streetLines = cszIdx > 0 ? addrLines.slice(0, cszIdx) : addrLines.slice(0, Math.max(1, addrLines.length - 1));
+        const street = streetLines.map(l => l.replace(/,\s*$/, '')).join(', ');
+        if (street) trySet('f-lender-street', street);
+        if (cszLine) {
+          const csz = cszLine.match(/^([^,]+),?\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
           if (csz) {
             trySet('f-lender-city',  csz[1].trim());
             trySet('f-lender-state', csz[2].trim());
@@ -7617,16 +7624,21 @@ function extractOrderData(raw) {
     const npaStateNext   = text.match(/State\s*:\s*\n\s*([A-Z]{2})(?!\w)/i);
     const npaState = (npaStateInline || npaStateNext)?.[1] || 'NY';
     // City: grab text after "City:" and stop at first label-like word or State/Zip
+    // City may come as merged "City: Springfield Gardens State: NY" — handle both forms
     const npaCityRaw = text.match(/City\s*:\s*([A-Za-z][^\n\r]{2,40})/i);
     const npaCity = npaCityRaw
-      ? npaCityRaw[1].replace(/\s+(State\s*:|Zip|County\s*:|Address2\s*:|\d{5}).*$/i, '').trim()
+      ? npaCityRaw[1]
+          .replace(/^City\s*:\s*/i, '')                              // strip accidental "City:" prefix
+          .replace(/\s+(State\s*:|Zip|County\s*:|Address2\s*:|\d{5}).*$/i, '') // stop at next label
+          .trim()
       : '';
     // Address 1: grab only up to first run of 2+ spaces or a label keyword
     const npaAddr1Raw = text.match(/Address\s*1\s*:\s*(\d[^\n\r]{4,70})/i);
     const npaAddr1 = npaAddr1Raw
       ? npaAddr1Raw[1]
-          .replace(/\s{2,}.*$/, '')          // stop at double-space (two-column merge)
-          .replace(/\s*(Address2?|City|State|Zip)\s*:.*$/i, '') // stop at any label
+          .replace(/\s{2,}.*$/, '')                               // stop at double-space (two-column merge)
+          .replace(/\s*(Address\s*2?|City|State|Zip|County)\s*:.*$/i, '') // stop at any label
+          .replace(/\s+N\/?A\s*$/i, '')                          // strip trailing "N/A"
           .trim()
       : '';
     if (npaAddr1 && npaCity) {
@@ -7666,9 +7678,15 @@ function extractOrderData(raw) {
       trySet('f-inspection-time', npaInspM[2].replace(/:00\s/, ' ').trim());
     }
 
-    // Borrower / contact — "Borrower: Mary Gaffney"
-    const npaBorrowerM = text.match(/Borrower\s*:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i);
-    if (npaBorrowerM) setBorrowerFields([npaBorrowerM[1].trim()]);
+    // Borrower / contact — "Borrower: Danny Leon Velez   Phone"
+    // Browser may merge next column label ("Phone", "Cell#", "Email:") onto same line
+    const npaBorrowerM = text.match(/Borrower\s*:\s*([A-Z][a-z]+(?:\s+[A-Za-z][a-z]+)*)/i);
+    if (npaBorrowerM) {
+      const borrowerName = npaBorrowerM[1]
+        .replace(/\s+(Phone|Cell|Email|Fax|Address|Suite|Floor|#).*$/i, '') // strip bleeding labels
+        .trim();
+      if (borrowerName) setBorrowerFields([borrowerName]);
+    }
 
     // Phone — Cell# first, then Phone#
     const npaCellM  = text.match(/Cell\s*#\s*[\s:]*(\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4})/i);
