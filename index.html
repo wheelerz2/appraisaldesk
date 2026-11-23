@@ -7350,7 +7350,7 @@ function extractOrderData(raw) {
   // Similarly: "Address 1:  Address2:" / "4916 66Th St  N/A"
   //            "Borrower:  Phone#" / "Antonio Ambrosino  N/A"
   //            "Work#:  Cell#" / "N/A  718-938-7476"
-  const isAppraisalLinks = /appraisal\s*links|appraisalscope/i.test(text);
+  const isAppraisalLinks = /appraisal\s*links|appraisalscope/i.test(text) && !/nationwideamc\.com|Nationwide\s+Property\s+&\s+Appraisal/i.test(text);
   console.log('[AD] isAppraisalLinks:', isAppraisalLinks, '| text[:300]:', JSON.stringify(text.slice(0,300)));
   if (isAppraisalLinks) {
     // Helper: get value on the NEXT non-empty line after a label
@@ -7595,11 +7595,18 @@ function extractOrderData(raw) {
                    || text.match(/\b(AMC-\d[\w\-]+)\b/i);
     if (npaAmcIdM) trySet('f-amcid', npaAmcIdM[1].trim());
 
-    // Property address — "Address 1:\n115-05 Mexico Street" or block before "City:"
-    const npaAddr1M = text.match(/Address\s*1\s*:\s*\n?\s*([^\n]{5,60})/i);
-    const npaCityM  = text.match(/City\s*:\s*\n?\s*([^\n]{2,40})/i);
-    const npaStateM = text.match(/State\s*:\s*\n?\s*([A-Z]{2})/i);
+    // Property address — handles two-column NPA layout:
+    // "Address 1: 137-64 Westgate Street    Address2: N/A"
+    // "City: Springfield Gardens            State: NY"
+    // "Zip Code: 11413"
     const npaZipM   = text.match(/Zip\s+Code\s*:\s*(\d{5})/i);
+    const npaStateM = text.match(/State\s*:\s*([A-Z]{2})(?![A-Za-z])/i);
+    // City: strip anything after whitespace+State: or whitespace+Zip
+    const npaCityRaw = text.match(/City\s*:\s*([A-Za-z][^\n\r]{2,40})/i);
+    const npaCity = npaCityRaw ? npaCityRaw[1].replace(/\s+(State:|Zip|County:|\d{5}).*$/i,'').trim() : '';
+    // Address 1: strip trailing "Address2:..." noise
+    const npaAddr1Raw = text.match(/Address\s*1\s*:\s*([^\n\r]{5,80})/i);
+    const npaAddr1 = npaAddr1Raw ? npaAddr1Raw[1].replace(/\s+Address2?.*$/i,'').trim() : '';
     // Also try the prominent address block before "Property Types:"
     const npaAddrBlockM = text.match(/(\d[\w\-]+ [A-Za-z][^\n]{3,50})\n([A-Za-z][^\n]{2,40})\nZip Code:/i);
     if (npaAddrBlockM) {
@@ -7608,18 +7615,20 @@ function extractOrderData(raw) {
       const state  = npaStateM ? npaStateM[1] : 'NY';
       const zip    = npaZipM   ? npaZipM[1]   : '';
       setAddressFields(`${street}, ${city} ${state} ${zip}`.trim());
-    } else if (npaAddr1M && npaCityM) {
-      const street = npaAddr1M[1].trim();
-      const city   = npaCityM[1].trim();
+    } else if (npaAddr1 && npaCity) {
       const state  = npaStateM ? npaStateM[1] : 'NY';
       const zip    = npaZipM   ? npaZipM[1]   : '';
-      setAddressFields(`${street}, ${city} ${state} ${zip}`.trim());
+      setAddressFields(`${npaAddr1}, ${npaCity} ${state} ${zip}`.trim());
     }
 
-    // Form type — "Product Type: Appraisal URAR" or "JobType: ... (UAD 3.6)"
+    // Form type — "JobType: 1004/1007 - (URAR) with Rent Schedule" or "Product Type: Appraisal URAR"
+    const npaJobTypeM = text.match(/JobType\s*:\s*([^\n\r]{4,80})/i);
     const npaFormM = text.match(/Product\s+Type\s*:\s*Appraisal\s+([\w\s]{2,20})/i)
                   || text.match(/JobType\s*:\s*[\w\s]+?\((UAD[\s\d.]+)\)/i);
-    if (npaFormM) {
+    if (npaJobTypeM) {
+      const fType = detectFormType(npaJobTypeM[1]);
+      if (fType) trySet('f-type', fType);
+    } else if (npaFormM) {
       const fType = detectFormType(npaFormM[1]);
       if (fType) trySet('f-type', fType);
     }
@@ -8346,11 +8355,12 @@ function extractOrderData(raw) {
 
 // Shared helper: detect form type from a text snippet
 function detectFormType(t) {
-  if (/\b2090\b|co-?op\s+interest/i.test(t)) return '1073';
-  if (/\b1073\b|individual\s+condo|condo/i.test(t)) return '1073';
+  const hasRental = /\b1007\b|rent\s+schedule|w\/?rental/i.test(t);
+  if (/\b2090\b|co-?op\s+interest/i.test(t)) return hasRental ? '1073 w/Rental' : '1073';
+  if (/\b1073\b|individual\s+condo|condo/i.test(t)) return hasRental ? '1073 w/Rental' : '1073';
   if (/\b1025\b|sm\.?\s*res|small\s+res|2-4\s+family|multi.?family|res\.?\s*inc|two\s+to\s+four\s+family|two[\s\-]four\s+family/i.test(t)) return '1025';
-  if (/\b3\.6\b|3\.6\s+uad|traditional\s+appraisal|uad\s+.*\s*conv\s*(?:condo|traditional)|jumbo\s+conv/i.test(t)) return '3.6';
-  if (/\b1004\b|single[\s\-]family|sfr\b/i.test(t)) return '1004';
+  if (/\b3\.6\b|3\.6\s+uad|traditional\s+appraisal|uad\s+.*\s*conv\s*(?:condo|traditional)|jumbo\s+conv/i.test(t)) return hasRental ? '3.6 w/Rental' : '3.6';
+  if (/\b1004\b|single[\s\-]family|sfr\b/i.test(t)) return hasRental ? '1004 w/Rental' : '1004';
   if (/\b2055\b|drive[\s\-]by|exterior[\s\-]only/i.test(t)) return '2055';
   if (/desktop\s+appraisal|hybrid/i.test(t)) return 'Desktop';
   if (/\bland\s+appraisal\b|vacant\s+land/i.test(t)) return 'Land';
