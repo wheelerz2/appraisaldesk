@@ -7552,45 +7552,49 @@ function extractOrderData(raw) {
     // AMC
     trySet('f-amc', 'Nationwide Property & Appraisal');
 
-    // Lender — "Client displayed on report:" then lender name follows (may be several lines later)
-    // Scan forward from that label; skip blank lines and lines that look like continuations
-    // of the AMC company block (e.g. "Appraisal Services") — those don't have numbers or LLC/Inc
+    // Lender — browser merges onto one line: "Client displayed on report: Arc Home Loan LLC   Loan Type: Conventional"
+    // So grab everything after "report:" on that same line, before "Loan Type:" or end of line
     const npaClientLabelIdx = text.search(/Client\s+displayed\s+on\s+report\s*:/i);
     let npaLenderName = '';
     if (npaClientLabelIdx >= 0) {
-      const afterLabel = text.slice(npaClientLabelIdx);
-      // Skip the label line itself, then find first line that looks like a lender name
-      const labelLineEnd = afterLabel.indexOf('\n');
-      const afterLabelLines = afterLabel.slice(labelLineEnd + 1).split('\n');
-      for (const rawLine of afterLabelLines) {
-        const line = rawLine.trim();
-        if (!line) continue;
-        // Stop if we've hit a property/order section
-        if (/^(JobType|Loan\s+Type|Address\s*1|City:|Zip|Property|Borrower|Due\s+Date)/i.test(line)) break;
-        // Skip lines that look like AMC info (email, phone, URL) or pure continuation words
-        if (/@|www\.|http|\.com|^\+?\d|^(Phone|Email|Fax|Cell)\s*:/i.test(line)) continue;
-        // Skip short fragments that are likely AMC name continuations (< 4 words, no LLC/Bank/Mortgage)
-        const wordCount = line.split(/\s+/).length;
-        if (wordCount <= 2 && !/LLC|Inc\.|Corp|Bank|Mortgage|Loan|Credit|Trust|Home/i.test(line)) continue;
-        // This line is the lender name
-        npaLenderName = line
-          .replace(/\s*(Loan\s+Type|JobType|Intended|AMC\s+Lic|Client\s+Fee|\$|Process\s+Type|FHA)[^\n]*/i, '')
-          .replace(/\s+LLC\s+\w.*$/, ' LLC')
-          .replace(/\s+Inc\.?\s+\w.*$/, ' Inc')
-          .replace(/\s+Corp\.?\s+\w.*$/, ' Corp')
+      // Try inline first: label + name on same line
+      const inlineM = text.slice(npaClientLabelIdx).match(
+        /Client\s+displayed\s+on\s+report\s*:\s*([A-Za-z][^\n]{3,80})/i
+      );
+      if (inlineM) {
+        npaLenderName = inlineM[1]
+          .replace(/\s{2,}.*$/, '')                           // stop at double-space (column merge)
+          .replace(/\s+(Loan\s+Type|JobType|Intended|AMC\s+Lic|Client\s+Fee|Process|FHA|\$).*$/i, '')
           .trim();
-        break;
+      }
+      // Fallback: name on the next non-empty line after the label
+      if (!npaLenderName) {
+        const afterLabel = text.slice(npaClientLabelIdx);
+        const labelLineEnd = afterLabel.indexOf('\n');
+        for (const rawLine of afterLabel.slice(labelLineEnd + 1).split('\n')) {
+          const line = rawLine.trim();
+          if (!line) continue;
+          if (/^(JobType|Loan\s+Type|Address|City:|Zip|Property|Borrower|Due\s+Date)/i.test(line)) break;
+          if (/@|www\.|http|\.com|^\+?\d/.test(line)) continue;
+          const words = line.split(/\s+/).length;
+          if (words <= 2 && !/LLC|Inc\b|Corp|Bank|Mortgage|Loan|Trust|Home/i.test(line)) continue;
+          npaLenderName = line
+            .replace(/\s{2,}.*$/, '')
+            .replace(/\s+(Loan\s+Type|JobType|Intended|AMC\s+Lic|Client\s+Fee|Process|FHA|\$).*$/i, '')
+            .trim();
+          break;
+        }
       }
     }
     if (npaLenderName) trySet('f-lender', npaLenderName);
 
-    // Lender address — lines immediately after the lender name, before JobType/Loan Type
-    // The PDF has: LenderName\n224 West Strawbridge Drive,\nSuite 200\nMoorestown, NJ 08057\nJobType:
+    // Lender address — lines immediately after the "Client displayed on report:" line
+    // Browser: that line contains the name inline, then address lines follow on next lines
     if (npaLenderName) {
-      // Search for lender name starting from the "Client displayed on report:" label position
-      const searchStart  = npaClientLabelIdx >= 0 ? npaClientLabelIdx : 0;
-      const lenderIdx    = text.indexOf(npaLenderName, searchStart);
-      const afterLender  = lenderIdx >= 0 ? text.slice(lenderIdx + npaLenderName.length) : '';
+      // Find the end of the "Client displayed on report:..." line
+      const clientLineStart = npaClientLabelIdx >= 0 ? npaClientLabelIdx : 0;
+      const clientLineEnd   = text.indexOf('\n', clientLineStart);
+      const afterLender     = clientLineEnd >= 0 ? text.slice(clientLineEnd + 1) : '';
       const addrLines    = [];
       for (const line of afterLender.split('\n').map(l => l.trim()).filter(Boolean)) {
         if (/^(JobType|Loan\s+Type|Intended\s+Use|AMC\s+Lic|Client\s+Fee|Process|FHA|\$\d|Due\s+Date)/i.test(line)) break;
@@ -7648,6 +7652,7 @@ function extractOrderData(raw) {
     const npaCity = npaCityRaw
       ? npaCityRaw[1]
           .replace(/^City\s*:\s*/i, '')                              // strip accidental "City:" prefix
+          .replace(/\s{2,}.*$/, '')                                   // stop at double-space (column merge)
           .replace(/\s+(State\s*:|Zip|County\s*:|Address2\s*:|\d{5}).*$/i, '') // stop at next label
           .trim()
       : '';
@@ -7702,6 +7707,7 @@ function extractOrderData(raw) {
     const npaBorrowerM = text.match(/Borrower\s*:\s*([A-Z][a-z]+(?:\s+[A-Za-z][a-z]+)*)/i);
     if (npaBorrowerM) {
       const borrowerName = npaBorrowerM[1]
+        .replace(/\s{2,}.*$/, '')                                        // stop at double-space
         .replace(/\s+(Phone|Cell|Email|Fax|Address|Suite|Floor|#).*$/i, '') // strip bleeding labels
         .trim();
       if (borrowerName) setBorrowerFields([borrowerName]);
