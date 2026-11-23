@@ -7586,6 +7586,7 @@ function extractOrderData(raw) {
         }
       }
     }
+    console.log('[NPA] clientLabelIdx:', npaClientLabelIdx, '| lenderName:', JSON.stringify(npaLenderName));
     if (npaLenderName) trySet('f-lender', npaLenderName);
 
     // Lender address — lines immediately after the "Client displayed on report:" line
