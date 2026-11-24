@@ -1808,6 +1808,12 @@ body.is-admin .admin-only { display: block !important; }
 .acct-invoice-table .badge-partial { background:#e0e7ff; color:#3730a3; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
 .acct-section-divider { border:none; border-top:2px solid var(--border); margin:32px 0 24px; }
 .acct-invoice-table .badge-partial { background:#dbeafe; color:#1e40af; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+.acct-search-bar { display:flex; align-items:center; gap:8px; margin:8px 0 6px; }
+.acct-search-bar input { flex:1; padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; background:var(--card); color:var(--fg); outline:none; }
+.acct-search-bar input:focus { border-color:#3b82f6; box-shadow:0 0 0 2px rgba(59,130,246,.15); }
+.acct-search-bar .acct-search-clear { cursor:pointer; font-size:16px; color:var(--muted); padding:0 4px; display:none; }
+.acct-search-bar .acct-search-clear.vis { display:block; }
+.acct-search-count { font-size:12px; color:var(--muted); margin-bottom:4px; }
 
 /* print styles */
 @media print {
@@ -2213,6 +2219,15 @@ body.is-admin .admin-only { display: block !important; }
         <button class="acct-tab" onclick="setAcctFilter('paid',this)">Paid</button>
         <button class="acct-tab" onclick="setAcctFilter('all',this)">All</button>
       </div>
+
+      <!-- Open invoice search bar -->
+      <div class="acct-search-bar" id="acct-search-bar" style="display:none">
+        <input type="search" id="acct-search-input" placeholder="Search by lender, AMC, or address…"
+               oninput="acctSearchChanged(this.value)"
+               onsearch="acctSearchChanged(this.value)">
+        <span class="acct-search-clear" id="acct-search-clear" onclick="acctSearchClear()" title="Clear">✕</span>
+      </div>
+      <div class="acct-search-count" id="acct-search-count" style="display:none"></div>
 
       <!-- Invoice table -->
       <div class="income-table-wrap" style="margin-top:0">
@@ -9184,6 +9199,7 @@ function incomeExportCSV() {
 // ══════════════════════════════════════════
 let acctFilter = 'open';
 let acctYearFilter = 'this'; // 'this' | 'last' | '3yr'
+let acctSearch = ''; // open-invoice search string
 
 function setAcctYear(mode, btn) {
   acctYearFilter = mode;
@@ -9198,6 +9214,22 @@ function setAcctFilter(f, btn) {
   const firstTabGroup = document.querySelector('#accounting-page .acct-tabs');
   if (firstTabGroup) firstTabGroup.querySelectorAll('.acct-tab').forEach(t => t.classList.remove('active'));
   if (btn) btn.classList.add('active');
+  renderAccounting();
+}
+
+function acctSearchChanged(val) {
+  acctSearch = (val || '').trim().toLowerCase();
+  const clearBtn = document.getElementById('acct-search-clear');
+  if (clearBtn) clearBtn.classList.toggle('vis', acctSearch.length > 0);
+  renderAccounting();
+}
+
+function acctSearchClear() {
+  acctSearch = '';
+  const inp = document.getElementById('acct-search-input');
+  if (inp) inp.value = '';
+  const clearBtn = document.getElementById('acct-search-clear');
+  if (clearBtn) clearBtn.classList.remove('vis');
   renderAccounting();
 }
 
@@ -9534,12 +9566,42 @@ function renderAccounting() {
     }
   }
 
-  // ── Invoice table (always all-time, filtered by Open/Paid/All tab) ───────
+  // ── Invoice table (always all-time, filtered by Open/Paid/All tab + search) ──
+  // Show/hide search bar (only on open invoices tab)
+  const searchBarEl = document.getElementById('acct-search-bar');
+  if (searchBarEl) searchBarEl.style.display = acctFilter === 'open' ? '' : 'none';
+  if (acctFilter !== 'open' && acctSearch) {
+    // Reset search when switching away from open tab
+    acctSearch = '';
+    const inp = document.getElementById('acct-search-input');
+    if (inp) inp.value = '';
+    const clearBtn = document.getElementById('acct-search-clear');
+    if (clearBtn) clearBtn.classList.remove('vis');
+  }
+
   const filtered = allInvoicesMapped.filter(o => {
     if (acctFilter === 'open') return o._status !== 'paid';
     if (acctFilter === 'paid') return o._status === 'paid';
     return true;
+  }).filter(o => {
+    if (!acctSearch) return true;
+    const lender = (o.lender || '').toLowerCase();
+    const amc    = (o.amc    || '').toLowerCase();
+    const addr   = (o.address|| '').toLowerCase();
+    return lender.includes(acctSearch) || amc.includes(acctSearch) || addr.includes(acctSearch);
   }).sort((a,b) => (b.due||b.created||'').localeCompare(a.due||a.created||''));
+
+  // Show/hide search result count
+  const countEl = document.getElementById('acct-search-count');
+  if (countEl) {
+    if (acctFilter === 'open' && acctSearch) {
+      const totalOpen = allInvoicesMapped.filter(o => o._status !== 'paid').length;
+      countEl.style.display = '';
+      countEl.textContent = `${filtered.length} of ${totalOpen} open invoice${totalOpen !== 1 ? 's' : ''} match "${acctSearch}"`;
+    } else {
+      countEl.style.display = 'none';
+    }
+  }
 
   const tbody = document.getElementById('acct-tbody');
   if (!tbody) return;
