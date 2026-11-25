@@ -1814,6 +1814,15 @@ body.is-admin .admin-only { display: block !important; }
 .acct-search-bar .acct-search-clear { cursor:pointer; font-size:16px; color:var(--muted); padding:0 4px; display:none; }
 .acct-search-bar .acct-search-clear.vis { display:block; }
 .acct-search-count { font-size:12px; color:var(--muted); margin-bottom:4px; }
+.new-co-prompt { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:7px 10px; margin:4px 0; background:var(--accent-muted, #eff6ff); border:1px solid var(--accent-border, #bfdbfe); border-radius:6px; font-size:12px; color:var(--fg); animation:fadeIn .18s ease; }
+[data-theme="dark"] .new-co-prompt, @media (prefers-color-scheme:dark) { :root:not([data-theme="light"]) .new-co-prompt { background:#1e3a5f; border-color:#2563eb; } }
+.new-co-prompt b { font-weight:600; }
+.new-co-prompt-actions { display:flex; gap:6px; margin-left:auto; }
+.new-co-prompt-actions button { padding:3px 10px; border-radius:4px; font-size:12px; border:1px solid; cursor:pointer; white-space:nowrap; }
+.new-co-btn-save { background:#2563eb; color:#fff; border-color:#1d4ed8; }
+.new-co-btn-save:hover { background:#1d4ed8; }
+.new-co-btn-dismiss { background:transparent; color:var(--muted); border-color:var(--border); }
+.new-co-btn-dismiss:hover { background:var(--hover); }
 
 /* print styles */
 @media print {
@@ -2659,6 +2668,7 @@ body.is-admin .admin-only { display: block !important; }
           <label>Lender</label>
           <div class="ac-wrap">
             <input type="text" id="f-lender" autocomplete="off" placeholder="Type to search or add…" oninput="acInput('lender')" onfocus="acInput('lender')" onblur="acBlur('lender');fillLenderAddressFields(this.value)">
+            <div id="new-lender-prompt" style="display:none"></div>
             <div class="ac-list" id="ac-lender"></div>
           </div>
         </div>
@@ -2666,6 +2676,7 @@ body.is-admin .admin-only { display: block !important; }
           <label>AMC</label>
           <div class="ac-wrap">
             <input type="text" id="f-amc" autocomplete="off" placeholder="Type to search or add…" oninput="acInput('amc')" onfocus="acInput('amc')" onblur="acBlur('amc')">
+            <div id="new-amc-prompt" style="display:none"></div>
             <div class="ac-list" id="ac-amc"></div>
           </div>
         </div>
@@ -4921,6 +4932,7 @@ function openOrderModal(id) {
 }
 
 function closeModal() {
+  dismissAllNewCoPrompts();
   document.getElementById('modal-overlay').classList.remove('open');
   editingOrderId = null;
   closeAllAC();
@@ -5327,6 +5339,62 @@ function acAddNew(type, name) {
 
 // Auto-save a company extracted from a PDF if it's not already in the database.
 // Also updates an existing record if it's missing address/phone and the form has them.
+function _getCoFormFields(type) {
+  return {
+    street: type === 'lender' ? (document.getElementById('f-lender-street')?.value.trim() || '') : '',
+    city:   type === 'lender' ? (document.getElementById('f-lender-city')?.value.trim()   || '') : '',
+    state:  type === 'lender' ? (document.getElementById('f-lender-state')?.value.trim()  || '') : '',
+    zip:    type === 'lender' ? (document.getElementById('f-lender-zip')?.value.trim()    || '') : '',
+    phone:  type === 'lender' ? (document.getElementById('f-lender-phone')?.value.trim()  || '') : '',
+  };
+}
+
+function dismissNewCoPrompt(type) {
+  const el = document.getElementById('new-' + type + '-prompt');
+  if (el) el.style.display = 'none';
+}
+
+function confirmSaveNewCo(type, name) {
+  const { street, city, state, zip, phone } = _getCoFormFields(type);
+  const newCo = { id: uid(), name, contact:'', phone: phone||'', email:'', website:'',
+    address: street||'', city: city||'', state: state||'', zip: zip||'', notes:'' };
+  if (type === 'lender') { lenders.push(newCo); _sbUpsertLender(newCo); }
+  else                   { amcs.push(newCo);    _sbUpsertAmc(newCo); }
+  dismissNewCoPrompt(type);
+  toast(`✚ "${name}" saved to ${type === 'lender' ? 'Lenders' : 'AMCs'}`);
+}
+
+function showNewCoPrompt(type, name) {
+  const promptEl = document.getElementById('new-' + type + '-prompt');
+  if (!promptEl) { confirmSaveNewCo(type, name); return; }
+  const label = type === 'lender' ? 'Lender' : 'AMC';
+  const db = type === 'lender' ? lenders : amcs;
+  // Build "select existing" options (top 5 by name similarity)
+  const existing = db.slice().sort((a,b) => a.name.localeCompare(b.name)).slice(0, 5);
+  const existHtml = existing.length
+    ? `<select id="new-co-sel-${type}" onchange="newCoSelectExisting('${type}',this.value)" style="font-size:12px;border:1px solid var(--border);border-radius:4px;padding:2px 4px;background:var(--card);color:var(--fg);max-width:160px"><option value="">— use existing —</option>${existing.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')}</select>`
+    : '';
+  promptEl.className = 'new-co-prompt';
+  promptEl.style.display = '';
+  promptEl.innerHTML = `<span>⚡ <b>${esc(name)}</b> is not in your ${label} database.</span>
+    ${existHtml}
+    <div class="new-co-prompt-actions">
+      <button class="new-co-btn-save" onclick="confirmSaveNewCo('${type}','${esc(name)}')">Save to ${label}s</button>
+      <button class="new-co-btn-dismiss" onclick="dismissNewCoPrompt('${type}')">Skip</button>
+    </div>`;
+}
+
+function newCoSelectExisting(type, selectedName) {
+  if (!selectedName) return;
+  // Replace the field value with the selected existing company name
+  const inp = document.getElementById('f-' + type);
+  if (inp) inp.value = selectedName;
+  // Fill address if lender
+  if (type === 'lender') fillLenderAddressFields(selectedName);
+  dismissNewCoPrompt(type);
+  toast(`Using existing: ${selectedName}`);
+}
+
 function autoSaveExtractedCompany(type) {
   const el = document.getElementById('f-' + type);
   if (!el || !el.value.trim()) return;
@@ -5335,18 +5403,11 @@ function autoSaveExtractedCompany(type) {
   const idx  = db.findIndex(c => c.name.toLowerCase() === name.toLowerCase());
 
   // Extra fields only available for lenders in the order form
-  const lStreet = type === 'lender' ? (document.getElementById('f-lender-street')?.value.trim() || '') : '';
-  const lCity   = type === 'lender' ? (document.getElementById('f-lender-city')?.value.trim()   || '') : '';
-  const lState  = type === 'lender' ? (document.getElementById('f-lender-state')?.value.trim()  || '') : '';
-  const lZip    = type === 'lender' ? (document.getElementById('f-lender-zip')?.value.trim()    || '') : '';
-  const phone   = type === 'lender' ? (document.getElementById('f-lender-phone')?.value.trim()  || '') : '';
+  const { street: lStreet, city: lCity, state: lState, zip: lZip, phone } = _getCoFormFields(type);
 
   if (idx < 0) {
-    // Brand new — create with whatever address/phone the form has
-    const newCo = { id: uid(), name, contact:'', phone: phone||'', email:'', website:'', address: lStreet||'', city: lCity||'', state: lState||'', zip: lZip||'', notes:'' };
-    if (type === 'lender') { lenders.push(newCo); _sbUpsertLender(newCo); }
-    else                   { amcs.push(newCo);    _sbUpsertAmc(newCo); }
-    toast(`✚ "${name}" added to ${type === 'lender' ? 'Lenders' : 'AMCs'}`);
+    // Brand new — prompt user instead of silently saving
+    showNewCoPrompt(type, name);
   } else {
     // Existing record — always update address/phone when the order has values
     const rec     = db[idx];
@@ -5366,6 +5427,11 @@ function autoSaveExtractedCompany(type) {
 function closeAllAC() {
   document.getElementById('ac-lender').classList.remove('open');
   document.getElementById('ac-amc').classList.remove('open');
+}
+
+function dismissAllNewCoPrompts() {
+  dismissNewCoPrompt('lender');
+  dismissNewCoPrompt('amc');
 }
 
 // ══════════════════════════════════════════
