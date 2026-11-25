@@ -8341,6 +8341,130 @@ function extractOrderData(raw) {
   }
 
   // ════════════════════════════════════════════════════════════════════════
+  // SERVICELINK VALUATION SOLUTIONS
+  // Detection: "Appraisal Order Sheet" header + "ServiceLink" or "Cherrington Parkway"
+  // Format: clean two-column label: value layout (pdftotext extracts cleanly)
+  // ════════════════════════════════════════════════════════════════════════
+  const isSL = /Appraisal\s+Order\s+Sheet/i.test(text) &&
+    (/ServiceLink|Cherrington\s+Parkway/i.test(text));
+
+  if (isSL) {
+    // Helper: grab value after a label on the same line or the next non-empty line
+    const slField = (label) => {
+      const re = new RegExp(label + '\\s*:\\s*([^\\n\\r]{1,120})', 'i');
+      const m = text.match(re);
+      if (m && m[1].trim()) return m[1].trim();
+      return '';
+    };
+
+    // ── AMC = ServiceLink ─────────────────────────────────────────────────
+    trySet('f-amc', 'ServiceLink Valuation Solutions');
+
+    // ── Order ID → AMC order ID ───────────────────────────────────────────
+    // "Order ID: 33010167"
+    const slOrderId = slField('Order\\s+ID');
+    if (slOrderId) trySet('f-amcid', slOrderId.replace(/\s+.*$/, '').trim()); // first token
+
+    // ── Order Date ────────────────────────────────────────────────────────
+    const slOrderDate = slField('Order\\s+Date');
+    if (slOrderDate) trySet('f-order-date', normalizeDate(slOrderDate.trim()));
+
+    // ── Due Date ──────────────────────────────────────────────────────────
+    const slDue = slField('Due\\s+Date');
+    if (slDue) trySet('f-due', normalizeDate(slDue.trim()));
+
+    // ── Lender (from "Lender:" line) ──────────────────────────────────────
+    const slLender = slField('Lender');
+    if (slLender && !/address/i.test(slLender)) {
+      trySet('f-lender', slLender);
+      // Try to auto-fill lender address from companies DB
+      if (typeof fillLenderAddressFields === 'function') fillLenderAddressFields(slLender);
+    }
+
+    // ── Lender address (from "Address:" + "City, State, Zip:" under Client Info) ──
+    // The PDF has two "Address:" sections — we want the one after "Lender:"
+    const slClientInfoIdx = text.search(/Client\s+Information/i);
+    const slPropInfoIdx   = text.search(/Property\s+and\s+Borrower/i);
+    // Client Info block = between Client Information and Property and Borrower
+    const slClientBlock = slClientInfoIdx >= 0 && slPropInfoIdx > slClientInfoIdx
+      ? text.slice(slClientInfoIdx, slPropInfoIdx)
+      : (slClientInfoIdx >= 0 ? text.slice(slClientInfoIdx, slClientInfoIdx + 600) : '');
+
+    if (slClientBlock) {
+      // "Address:               1801 Park View Drive"
+      const slLenderAddrM = slClientBlock.match(/Address\s*:\s*([^\n\r]+)/i);
+      // "City, State, Zip:      Shoreview, MN 55126"
+      const slLenderCszM  = slClientBlock.match(/City,\s*State,\s*Zip\s*:\s*([^\n\r]+)/i);
+      if (slLenderAddrM && slLenderAddrM[1].trim()) {
+        trySet('f-lender-street', slLenderAddrM[1].trim());
+      }
+      if (slLenderCszM && slLenderCszM[1].trim()) {
+        const cszRaw = slLenderCszM[1].trim();
+        // "Shoreview, MN 55126"
+        const cszM = cszRaw.match(/^([^,]+),?\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+        if (cszM) {
+          trySet('f-lender-city',  cszM[1].trim());
+          trySet('f-lender-state', cszM[2].trim());
+          trySet('f-lender-zip',   cszM[3].trim());
+        }
+      }
+    }
+
+    // ── Loan Purpose ──────────────────────────────────────────────────────
+    const slLoanPurpose = slField('Loan\\s+Purpose');
+    if (slLoanPurpose) trySet('f-purpose', normalizePurpose(slLoanPurpose));
+
+    // ── Product Description → form type ──────────────────────────────────
+    const slProduct = slField('Product\\s+Description');
+    if (slProduct) {
+      const fType = detectFormType(slProduct);
+      if (fType) trySet('f-type', fType);
+    }
+
+    // ── Property Address ──────────────────────────────────────────────────
+    // "Address:               160 HENRY ST, APT 8C"
+    // "City, State, Zip:      Brooklyn, NY 11201"
+    const slPropBlock = slPropInfoIdx >= 0
+      ? text.slice(slPropInfoIdx, slPropInfoIdx + 600)
+      : '';
+
+    if (slPropBlock) {
+      const slAddrM = slPropBlock.match(/Address\s*:\s*([^\n\r]+)/i);
+      const slCszM  = slPropBlock.match(/City,\s*State,\s*Zip\s*:\s*([^\n\r]+)/i);
+      if (slAddrM && slCszM) {
+        const rawAddr = slAddrM[1].trim();   // "160 HENRY ST, APT 8C"
+        const rawCsz  = slCszM[1].trim();    // "Brooklyn, NY 11201"
+        setAddressFields(rawAddr + ', ' + rawCsz);
+      }
+    }
+
+    // ── Fee (Product Fee) ─────────────────────────────────────────────────
+    const slFeeM = text.match(/Product\s+Fee\s*\$?([\d,]+(?:\.\d{2})?)/i);
+    if (slFeeM) trySet('f-fee', slFeeM[1].replace(/,/g,''));
+
+    // ── Borrower Name ─────────────────────────────────────────────────────
+    const slBorrower = slField('Borrower\\s+Name');
+    if (slBorrower && !/none|n\/a/i.test(slBorrower)) setBorrowerFields([slBorrower]);
+
+    // ── Contact Name + Phone + Email (Property Access section) ───────────
+    const slAccessIdx = text.search(/Property\s+Access/i);
+    if (slAccessIdx >= 0) {
+      const slAccessBlock = text.slice(slAccessIdx, slAccessIdx + 500);
+      const slContactM = slAccessBlock.match(/Contact\s+Name\s*:\s*([^\n\r]+)/i);
+      if (slContactM && slContactM[1].trim()) {
+        const contactVal = slContactM[1].trim();
+        if (!/none|n\/a/i.test(contactVal)) trySet('f-contact-name', contactVal);
+      }
+      const slOfficePhM = slAccessBlock.match(/Phone\s*[-–]?\s*Office\s*:\s*([^\n\r]+)/i);
+      if (slOfficePhM) trySet('f-contact-phone', slOfficePhM[1].trim());
+      const slEmailM = slAccessBlock.match(/Email\s*:\s*([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/i);
+      if (slEmailM) trySet('f-email', slEmailM[1].trim());
+    }
+
+    return filled;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
   // GENERIC FALLBACK
   // ════════════════════════════════════════════════════════════════════════
 
